@@ -305,6 +305,41 @@ export function InputBox(props: InputBoxProps) {
       return;
     }
 
+    // Ctrl+W: Delete word - update value signal directly
+    // The input is controlled by value={value()}, so we update the signal
+    // Deletes trailing whitespace + word, or just the word/non-word block
+    // e.g., "abc-def " → "abc-", "abc-def" → "abc-" → "abc" → ""
+    if (evt.ctrl && evt.name === "w") {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setValue((current) => {
+        // First strip trailing whitespace
+        let text = current.replace(/\s+$/, "");
+        // If we removed whitespace and there's still content, delete the word
+        if (text.length < current.length && text.length > 0) {
+          // Deleted whitespace, now delete the word before it
+          if (/[a-zA-Z0-9_]$/.test(text)) {
+            return text.replace(/[a-zA-Z0-9_]+$/, "");
+          }
+          return text.replace(/[^a-zA-Z0-9_\s]+$/, "");
+        }
+        // No trailing whitespace - delete word or non-word chars
+        if (/[a-zA-Z0-9_]$/.test(text)) {
+          return text.replace(/[a-zA-Z0-9_]+$/, "");
+        }
+        return text.replace(/[^a-zA-Z0-9_\s]+$/, "");
+      });
+      return;
+    }
+
+    // Ctrl+U: Clear line
+    if (evt.ctrl && evt.name === "u") {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setValue("");
+      return;
+    }
+
     // Handle popover navigation
     if (popoverMode()) {
       const suggestions = currentSuggestions();
