@@ -162,17 +162,20 @@ export interface FragmentClass<
 
 /**
  * Check if a value matches the Fragment shape.
+ * Handles both function-based fragments (class-based) and object-based fragments (like tools).
  */
 export function isFragment(
   value: unknown,
 ): value is Fragment<string, string, any[]> {
+  if (value === null || value === undefined) return false;
+  const v = value as any;
   return (
-    typeof value === "function" &&
-    "type" in value &&
-    typeof value.type === "string" &&
-    "id" in value &&
-    "template" in value &&
-    "references" in value
+    (typeof value === "function" || typeof value === "object") &&
+    "type" in v &&
+    typeof v.type === "string" &&
+    "id" in v &&
+    "template" in v &&
+    "references" in v
   );
 }
 

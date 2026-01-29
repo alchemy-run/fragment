@@ -1,4 +1,5 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect } from "bun:test";
+import { it } from "./test.ts";
 import * as S from "effect/Schema";
 import { Agent } from "../src/agent.ts";
 import { Channel } from "../src/chat/channel.ts";

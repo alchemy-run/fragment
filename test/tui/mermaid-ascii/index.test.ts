@@ -7,7 +7,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { render } from "../../../src/tui/mermaid-ascii/index.ts";
 
 const TESTDATA_DIR = path.join(__dirname, "testdata");

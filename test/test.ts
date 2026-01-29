@@ -4,7 +4,7 @@ import * as Persistence from "@effect/experimental/Persistence";
 import { FetchHttpClient, FileSystem } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import * as PlatformConfigProvider from "@effect/platform/PlatformConfigProvider";
-import { it, type TestContext } from "@effect/vitest";
+import { it as bunIt } from "bun:test";
 import { ConfigProvider, LogLevel } from "effect";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
@@ -26,10 +26,11 @@ const platform = Layer.mergeAll(
   lspLayer,
 );
 
-// Use any for requirements since we provide everything
+
+// Use Effect.Effect.Any to accept any Effect type
 type TestCase =
-  | Effect.Effect<void, any, any>
-  | ((ctx: TestContext) => Effect.Effect<void, any, any>);
+  | Effect.Effect<unknown, any, any>
+  | (() => Effect.Effect<unknown, any, any>);
 
 export function test(
   name: string,
@@ -46,13 +47,18 @@ export function test(
   const [options = {}, testCase] =
     args.length === 1 ? [undefined, args[0]] : args;
 
-  return it.scopedLive(
+  return bunIt(
     name,
-    (ctx) => {
-      const effect = typeof testCase === "function" ? testCase(ctx) : testCase;
-      return provideTestEnv(effect);
+    async () => {
+      // Check if testCase is an Effect or a function returning an Effect
+      const effect = Effect.isEffect(testCase)
+        ? testCase
+        : (testCase as () => Effect.Effect<unknown, any, any>)();
+      await Effect.runPromise(
+        Effect.scoped(provideTestEnv(effect)) as Effect.Effect<void>,
+      );
     },
-    options.timeout ?? 120_000,
+    { timeout: options.timeout ?? 120_000 },
   );
 }
 
@@ -61,11 +67,31 @@ test.skip = function (
   ...args: [{ timeout?: number }, TestCase] | [TestCase]
 ) {
   const [options = {}] = args.length === 1 ? [undefined] : args;
-  return it.skip(name, () => {}, options.timeout ?? 120_000);
+  return bunIt.skip(name, () => {}, { timeout: options.timeout ?? 120_000 });
 };
 
+/**
+ * Simple wrapper around bun:test's it() for running Effect tests.
+ * This mimics @effect/vitest's it.effect() pattern.
+ */
+export const it = Object.assign(bunIt, {
+  effect: function (
+    name: string,
+    fn: () => Effect.Effect<any, any, any>,
+    timeout?: number,
+  ) {
+    return bunIt(
+      name,
+      async () => {
+        await Effect.runPromise(fn() as Effect.Effect<void>);
+      },
+      { timeout: timeout ?? 60_000 },
+    );
+  },
+});
+
 /** Provide common layers and services to an effect */
-function provideTestEnv(effect: Effect.Effect<void, any, any>) {
+function provideTestEnv(effect: Effect.Effect<unknown, any, any>) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
 

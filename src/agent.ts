@@ -33,115 +33,6 @@ import type { MessageEncoded } from "@effect/ai/Prompt";
 import { AgentContent } from "./tui/components/agent-content.tsx";
 
 /**
- * Extracts all tool_use IDs from a message's content.
- * Tool calls have type "tool-call" and an "id" property.
- */
-function extractToolUseIds(message: MessageEncoded): string[] {
-  const ids: string[] = [];
-  if (Array.isArray(message.content)) {
-    for (const block of message.content) {
-      if (
-        typeof block === "object" &&
-        block !== null &&
-        "type" in block &&
-        block.type === "tool-call" &&
-        "id" in block &&
-        typeof block.id === "string"
-      ) {
-        ids.push(block.id);
-      }
-    }
-  }
-  return ids;
-}
-
-/**
- * Validates and repairs messages to ensure all tool_use IDs are unique.
- * Returns the repaired messages and logs a warning if duplicates were found.
- */
-function validateAndRepairMessages(
-  messages: readonly MessageEncoded[],
-  agentId: string,
-  threadId: string,
-): readonly MessageEncoded[] {
-  const seenIds = new Set<string>();
-  const duplicateIds = new Set<string>();
-
-  // First pass: identify duplicates
-  for (const message of messages) {
-    const ids = extractToolUseIds(message);
-    for (const id of ids) {
-      if (seenIds.has(id)) {
-        duplicateIds.add(id);
-      } else {
-        seenIds.add(id);
-      }
-    }
-  }
-
-  // If no duplicates, return original messages
-  if (duplicateIds.size === 0) {
-    return messages;
-  }
-
-  // Log warning about duplicates
-  log(
-    "spawn",
-    "WARNING: Found duplicate tool_use IDs in persisted messages, repairing",
-    {
-      agentId,
-      threadId,
-      duplicateIds: Array.from(duplicateIds),
-    },
-  );
-
-  // Second pass: repair by removing duplicate tool-call blocks
-  const repairedSeenIds = new Set<string>();
-  const repairedMessages: MessageEncoded[] = [];
-
-  for (const message of messages) {
-    if (!Array.isArray(message.content)) {
-      repairedMessages.push(message);
-      continue;
-    }
-
-    // Filter out duplicate tool-call blocks
-    const repairedContent = message.content.filter((block) => {
-      if (
-        typeof block === "object" &&
-        block !== null &&
-        "type" in block &&
-        block.type === "tool-call" &&
-        "id" in block &&
-        typeof block.id === "string"
-      ) {
-        if (repairedSeenIds.has(block.id)) {
-          return false; // Remove duplicate
-        }
-        repairedSeenIds.add(block.id);
-      }
-      return true;
-    });
-
-    // Only include message if it still has content
-    if (repairedContent.length > 0) {
-      repairedMessages.push({
-        ...message,
-        content: repairedContent as any,
-      });
-    }
-  }
-
-  log("spawn", "Repaired messages", {
-    originalCount: messages.length,
-    repairedCount: repairedMessages.length,
-    removedDuplicates: duplicateIds.size,
-  });
-
-  return repairedMessages;
-}
-
-/**
  * Agent type - an AI agent defined via template.
  * Extends Fragment for template support.
  */
@@ -679,3 +570,113 @@ const flush = (
     log("flush", `Truncating parts for agent ${agentId}`);
     yield* store.truncateAgentParts(threadId, agentId);
   });
+
+
+/**
+ * Extracts all tool_use IDs from a message's content.
+ * Tool calls have type "tool-call" and an "id" property.
+ */
+function extractToolUseIds(message: MessageEncoded): string[] {
+  const ids: string[] = [];
+  if (Array.isArray(message.content)) {
+    for (const block of message.content) {
+      if (
+        typeof block === "object" &&
+        block !== null &&
+        "type" in block &&
+        block.type === "tool-call" &&
+        "id" in block &&
+        typeof block.id === "string"
+      ) {
+        ids.push(block.id);
+      }
+    }
+  }
+  return ids;
+}
+
+/**
+ * Validates and repairs messages to ensure all tool_use IDs are unique.
+ * Returns the repaired messages and logs a warning if duplicates were found.
+ */
+function validateAndRepairMessages(
+  messages: readonly MessageEncoded[],
+  agentId: string,
+  threadId: string,
+): readonly MessageEncoded[] {
+  const seenIds = new Set<string>();
+  const duplicateIds = new Set<string>();
+
+  // First pass: identify duplicates
+  for (const message of messages) {
+    const ids = extractToolUseIds(message);
+    for (const id of ids) {
+      if (seenIds.has(id)) {
+        duplicateIds.add(id);
+      } else {
+        seenIds.add(id);
+      }
+    }
+  }
+
+  // If no duplicates, return original messages
+  if (duplicateIds.size === 0) {
+    return messages;
+  }
+
+  // Log warning about duplicates
+  log(
+    "spawn",
+    "WARNING: Found duplicate tool_use IDs in persisted messages, repairing",
+    {
+      agentId,
+      threadId,
+      duplicateIds: Array.from(duplicateIds),
+    },
+  );
+
+  // Second pass: repair by removing duplicate tool-call blocks
+  const repairedSeenIds = new Set<string>();
+  const repairedMessages: MessageEncoded[] = [];
+
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) {
+      repairedMessages.push(message);
+      continue;
+    }
+
+    // Filter out duplicate tool-call blocks
+    const repairedContent = message.content.filter((block) => {
+      if (
+        typeof block === "object" &&
+        block !== null &&
+        "type" in block &&
+        block.type === "tool-call" &&
+        "id" in block &&
+        typeof block.id === "string"
+      ) {
+        if (repairedSeenIds.has(block.id)) {
+          return false; // Remove duplicate
+        }
+        repairedSeenIds.add(block.id);
+      }
+      return true;
+    });
+
+    // Only include message if it still has content
+    if (repairedContent.length > 0) {
+      repairedMessages.push({
+        ...message,
+        content: repairedContent as any,
+      });
+    }
+  }
+
+  log("spawn", "Repaired messages", {
+    originalCount: messages.length,
+    repairedCount: repairedMessages.length,
+    removedDuplicates: duplicateIds.size,
+  });
+
+  return repairedMessages;
+}

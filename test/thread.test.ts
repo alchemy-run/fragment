@@ -1,6 +1,6 @@
 import type { MessageEncoded } from "@effect/ai/Prompt";
 import * as Effect from "effect/Effect";
-import { describe, expect } from "vitest";
+import { describe, expect } from "bun:test";
 import { Agent } from "../src/agent.ts";
 import { Channel } from "../src/chat/channel.ts";
 import { GroupChat } from "../src/chat/group-chat.ts";

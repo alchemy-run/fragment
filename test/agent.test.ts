@@ -1,7 +1,7 @@
 import * as FileSystem from "@effect/platform/FileSystem";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
-import { describe, expect } from "vitest";
+import { describe, expect } from "bun:test";
 import { Agent, spawn } from "../src/agent.ts";
 import * as File from "../src/file/index.ts";
 import { StateStore } from "../src/state/index.ts";

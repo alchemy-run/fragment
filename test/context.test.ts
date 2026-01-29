@@ -1,6 +1,7 @@
 import { NodeContext } from "@effect/platform-node";
 import * as FileSystem from "@effect/platform/FileSystem";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect } from "bun:test";
+import { it } from "./test.ts";
 import { JSONSchema } from "effect";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";

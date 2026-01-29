@@ -10,7 +10,7 @@
     "test": "bun test ./test",
     "test:tui": "bun test --preload @opentui/solid/preload ./test/tui/ --",
     "test:tui:update": "bun test --preload @opentui/solid/preload ./test/tui/ --update-snapshots",
-    "test:watch": "vitest",
+    "test:watch": "bun test ./test --watch",
     "download:env": "doppler secrets download --no-file --format env > .env"
   },
   "exports": {
@@ -68,11 +68,8 @@
     "yaml": "latest"
   },
   "devDependencies": {
-    "@effect/vitest": "latest",
     "bun-types": "latest",
-    "typescript": "^5",
-    "vite-plugin-solid": "^2.11.10",
-    "vitest": "latest"
+    "typescript": "^5"
   },
   "peerDependencies": {
     "@libsql/client": "latest"

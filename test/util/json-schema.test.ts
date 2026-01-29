@@ -1,5 +1,5 @@
 import { JSONSchema, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { schemaFromJsonSchema } from "../../src/util/json-schema.ts";
 
 /**

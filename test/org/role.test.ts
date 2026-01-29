@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { Agent } from "../../src/agent.ts";
 import { input } from "../../src/input.ts";
 import {
