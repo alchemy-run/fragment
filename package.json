@@ -1,0 +1,78 @@
+{
+  "name": "fragment",
+  "version": "0.0.1",
+  "bin": {
+    "fragment": "./bin/fragment.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./file": {
+      "bun": "./src/file/index.ts",
+      "types": "./lib/file/index.d.ts",
+      "default": "./lib/file/index.js"
+    },
+    "./tool": {
+      "bun": "./src/tool/index.ts",
+      "types": "./lib/tool/index.d.ts",
+      "default": "./lib/tool/index.js"
+    },
+    "./toolkit": {
+      "bun": "./src/toolkit/index.ts",
+      "types": "./lib/toolkit/index.d.ts",
+      "default": "./lib/toolkit/index.js"
+    },
+    "./tui": {
+      "bun": "./src/tui/index.tsx",
+      "types": "./lib/tui/index.d.ts",
+      "default": "./lib/tui/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:tui": "bun test --preload @opentui/solid/preload ./test/tui/ --",
+    "test:tui:update": "bun test --preload @opentui/solid/preload ./test/tui/ --update-snapshots",
+    "test:watch": "vitest",
+    "download:env": "doppler secrets download --no-file --format env > .env"
+  },
+  "dependencies": {
+    "@effect/ai": "latest",
+    "@effect/ai-anthropic": "latest",
+    "@effect/ai-openai": "latest",
+    "@effect/cli": "latest",
+    "@effect/experimental": "latest",
+    "@effect/platform": "latest",
+    "@effect/platform-node": "latest",
+    "@libsql/client": "^0.17.0",
+    "@mermaid-js/parser": "^0.6.3",
+    "@opentui/core": "^0.1.75",
+    "@opentui/solid": "^0.1.75",
+    "diff": "latest",
+    "effect": "latest",
+    "fzf": "^0.5.2",
+    "solid-js": "^1.9.10",
+    "web-tree-sitter": "0.25.10",
+    "yaml": "latest"
+  },
+  "devDependencies": {
+    "@effect/vitest": "latest",
+    "typescript": "^5",
+    "vite-plugin-solid": "^2.11.10",
+    "vitest": "latest"
+  },
+  "peerDependencies": {
+    "@libsql/client": "latest"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": {
+      "optional": true
+    }
+  }
+}
