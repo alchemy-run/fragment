@@ -3,6 +3,7 @@ import * as FileSystem from "@effect/platform/FileSystem";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { cwd, FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import { exec } from "../util/exec.ts";
@@ -18,7 +19,7 @@ Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+", etc.)`;
 const path = input(
   "path",
   S.optional(S.String),
-)`The directory to search in. Defaults to ${process.cwd()} if not specified.`;
+)`The directory to search in. Defaults to ${cwd} if not specified.`;
 
 const include = input(
   "include",
@@ -45,8 +46,11 @@ Given a ${pattern} and optional ${path} and ${include}:
 `(function* ({ pattern, path: searchDir, include }) {
   yield* Effect.logDebug(`[grep] pattern=${pattern} path=${searchDir}`);
 
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const fs = yield* FileSystem.FileSystem;
-  const searchPath = searchDir || process.cwd();
+  const searchPath = searchDir || config.cwd;
 
   const rgArgs = ["-nH", "--field-match-separator=|", "--regexp", pattern];
   if (include) {

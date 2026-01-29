@@ -1,7 +1,9 @@
 import * as FileSystem from "@effect/platform/FileSystem";
 import * as Path from "@effect/platform/Path";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import {
   formatDiagnostics,
@@ -43,12 +45,15 @@ Given a ${filePath}, ${oldString}, and ${newString}:
   newString,
   replaceAll: doReplaceAll,
 }) {
-    const pathService = yield* Path.Path;
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
+  const pathService = yield* Path.Path;
   const fs = yield* FileSystem.FileSystem;
 
   const filePath = pathService.isAbsolute(_filePath)
     ? _filePath
-    : pathService.join(process.cwd(), _filePath);
+    : pathService.join(config.cwd, _filePath);
 
   // Determine new content and whether this is a create operation
   let newContent: string;

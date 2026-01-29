@@ -1,6 +1,8 @@
 import * as FileSystem from "@effect/platform/FileSystem";
 import * as Path from "@effect/platform/Path";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import {
   formatDiagnostics,
@@ -32,12 +34,15 @@ Given a ${filePath} and ${content}:
     `[write] filePath=${_filePath} content.length=${content.length}`,
   );
 
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const path = yield* Path.Path;
   const fs = yield* FileSystem.FileSystem;
 
   const filePath = path.isAbsolute(_filePath)
     ? _filePath
-    : path.join(process.cwd(), _filePath);
+    : path.join(config.cwd, _filePath);
 
   // Ensure parent directory exists
   const dir = path.dirname(filePath);

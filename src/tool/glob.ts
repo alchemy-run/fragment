@@ -3,6 +3,7 @@ import * as Path from "@effect/platform/Path";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { cwd, FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import * as Ripgrep from "../util/ripgrep.ts";
@@ -19,7 +20,7 @@ Examples:
 const path = input(
   "path",
   S.optional(S.String),
-)`The directory to search in. Defaults to ${process.cwd()} if not specified.`;
+)`The directory to search in. Defaults to ${cwd} if not specified.`;
 
 const files = output(
   "files",
@@ -39,13 +40,16 @@ Given a ${pattern} and optional ${path}:
 `(function* ({ pattern, path: searchDir }) {
   yield* Effect.logDebug(`[glob] pattern=${pattern} path=${searchDir}`);
 
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const pathService = yield* Path.Path;
   const fs = yield* FileSystem.FileSystem;
 
-  let searchPath = searchDir || process.cwd();
+  let searchPath = searchDir || config.cwd;
   searchPath = pathService.isAbsolute(searchPath)
     ? searchPath
-    : pathService.resolve(process.cwd(), searchPath);
+    : pathService.resolve(config.cwd, searchPath);
 
   const fileList: { path: string; mtime: number }[] = [];
   const limit = 100;

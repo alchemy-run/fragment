@@ -7,15 +7,21 @@ import * as S from "effect/Schema";
 import { Agent } from "../src/agent.ts";
 import { Channel } from "../src/chat/channel.ts";
 import { GroupChat } from "../src/chat/group-chat.ts";
+import { cwd, isCwd } from "../src/config.ts";
 import { createContext, preamble } from "../src/context.ts";
 import * as File from "../src/file/index.ts";
 import { input } from "../src/input.ts";
 import { Group } from "../src/org/group.ts";
 import { Role } from "../src/org/role.ts";
 import { output } from "../src/output.ts";
-import { tool } from "../src/tool/tool.ts";
+import { Tool } from "../src/tool/tool.ts";
 import * as Toolkit from "../src/toolkit/index.ts";
 import { Toolkit as ToolkitFactory } from "../src/toolkit/toolkit.ts";
+import {
+  renderTemplate,
+  serialize,
+  stringify,
+} from "../src/util/render-template.ts";
 
 // Test layer with real filesystem for reading fixture files
 const TestLayer = NodeContext.layer;
@@ -480,7 +486,7 @@ settings:
       const message = input("message")`The message to echo`;
       const result = output("result")`The echoed message`;
 
-      const echoTool = tool("echo")`Echoes the ${message} back.
+      const echoTool = Tool("echo")`Echoes the ${message} back.
 Returns the ${result}.`(function* ({ message }) {
         return { result: message };
       });
@@ -553,7 +559,7 @@ A simple echo toolkit:
       const configPath = input("configPath")`Path to config`;
       const configResult = output("config")`The loaded config`;
 
-      const loadConfigTool = tool(
+      const loadConfigTool = Tool(
         "loadConfig",
       )`Loads configuration from ${ConfigFile}.
 Takes ${configPath} and returns ${configResult}.`(function* () {
@@ -629,7 +635,7 @@ Configuration tools:
       const task = input("task")`The task to delegate`;
       const result = output("result")`The result from helper`;
 
-      const delegateTool = tool("delegate")`Delegates a task to ${HelperAgent}.
+      const delegateTool = Tool("delegate")`Delegates a task to ${HelperAgent}.
 Takes ${task} and returns ${result}.`(function* ({ task }) {
         return { result: `Completed: ${task}` };
       });
@@ -711,7 +717,7 @@ Delegation tools:
       const dataInput = input("data")`The data to process`;
       const processedOutput = output("processed")`The processed result`;
 
-      const processTool = tool(
+      const processTool = Tool(
         "process",
       )`Reads from ${DataFile} and sends to ${ProcessorAgent}.
 Takes ${dataInput} and returns ${processedOutput}.`(function* ({ data }) {
@@ -801,7 +807,7 @@ Data processing tools:
       const b = input("b", S.Number)`Second number`;
       const sum = output("sum", S.Number)`The sum`;
 
-      const addTool = tool("add")`Adds ${a} and ${b}.
+      const addTool = Tool("add")`Adds ${a} and ${b}.
 Returns the ${sum}.`(function* ({ a, b }) {
         return { sum: a + b };
       });
@@ -861,13 +867,13 @@ Math operations:
       const inp2 = input("c")`Input C`;
       const out2 = output("d")`Output D`;
 
-      const toolA = tool("toolA")`Takes ${inp1}, returns ${out1}.`(function* ({
+      const toolA = Tool("toolA")`Takes ${inp1}, returns ${out1}.`(function* ({
         a,
       }) {
         return { b: a };
       });
 
-      const toolB = tool("toolB")`Takes ${inp2}, returns ${out2}.`(function* ({
+      const toolB = Tool("toolB")`Takes ${inp2}, returns ${out2}.`(function* ({
         c,
       }) {
         return { d: c };
@@ -914,7 +920,7 @@ Has 🛠️toolB
       const inp = input("x")`Input`;
       const out = output("y")`Output`;
 
-      const nestedTool = tool("nestedTool")`Takes ${inp}, returns ${out}.`(
+      const nestedTool = Tool("nestedTool")`Takes ${inp}, returns ${out}.`(
         function* ({ x }) {
           return { y: x };
         },
@@ -990,7 +996,7 @@ Nested toolkit with ${nestedTool}
       const inp = input("s")`String`;
       const out = output("r")`Result`;
 
-      const sharedTool = tool("shared")`Takes ${inp}, returns ${out}.`(
+      const sharedTool = Tool("shared")`Takes ${inp}, returns ${out}.`(
         function* ({ s }) {
           return { r: s };
         },
@@ -1395,7 +1401,7 @@ tests:
 
         const taskInput = input("task")`Task to run`;
         const taskOutput = output("result")`The task result`;
-        const runTool = tool(
+        const runTool = Tool(
           "run",
         )`Runs the ${taskInput}. Returns ${taskOutput}.`(function* ({ task }) {
           return { result: task };
@@ -1461,7 +1467,7 @@ toolkit: 🧰TaskToolkit`,
 
       const taskInput = input("task")`The task to dispatch`;
       const dispatchOutput = output("dispatched")`The dispatched task`;
-      const dispatchTool = tool(
+      const dispatchTool = Tool(
         "dispatch",
       )`Dispatches tasks to workers:${[WorkerA, WorkerB]}. Takes ${taskInput}. Returns ${dispatchOutput}.`(
         function* ({ task }) {
@@ -1501,7 +1507,7 @@ toolkit: 🧰TaskToolkit`,
 
       const nameInput = input("name")`Template name`;
       const htmlOutput = output("html")`The rendered HTML`;
-      const renderTool = tool(
+      const renderTool = Tool(
         "render",
       )`Renders one of these templates:${[Template1, Template2]}. Takes ${nameInput}. Returns ${htmlOutput}.`(
         function* ({ name }) {
@@ -1535,7 +1541,7 @@ toolkit: 🧰TaskToolkit`,
 
         const dataInput = input("data")`Data to transform`;
         const transformedOutput = output("transformed")`The transformed data`;
-        const transformTool = tool("transform")`Transforms data using:${{
+        const transformTool = Tool("transform")`Transforms data using:${{
           encode: Encoder,
           decode: Decoder,
         }}. Takes ${dataInput}. Returns ${transformedOutput}.`(function* ({
@@ -1577,7 +1583,7 @@ decode: "@decoder". Takes \${data}. Returns ^{transformed}.`,
         )`Output schema` {}
 
         const validateInput = input("payload")`Payload to validate`;
-        const validateTool = tool("validate")`Validates against schemas:${{
+        const validateTool = Tool("validate")`Validates against schemas:${{
           input: InputFile,
           output: OutputFile,
         }}. Takes ${validateInput}.`(function* ({ payload: _ }) {});
@@ -1613,7 +1619,7 @@ output: "[output.json](test/fixtures/output.json)". Takes \${payload}.`,
         class FormatterAgent extends Agent("formatter")`Formats output` {}
 
         const dataInput = input("data")`Data to process`;
-        const processTool = tool("process")`Processes data with:${{
+        const processTool = Tool("process")`Processes data with:${{
           config: RulesFile,
           pipeline: [ValidatorAgent, FormatterAgent],
         }}. Takes ${dataInput}.`(function* () {});
@@ -1650,7 +1656,7 @@ pipeline:
 
         const taskInput = input("task")`Task description`;
         const priorityInput = input("priority", S.Number)`Priority level`;
-        const assignTool = tool(
+        const assignTool = Tool(
           "assign",
         )`Assigns to workers:${[WorkerA, WorkerB]}. Takes ${taskInput} with ${priorityInput}.`(
           function* ({ task: _task, priority: _priority }) {},
@@ -1698,7 +1704,7 @@ pipeline:
 
         const nameInput = input("name")`Resource name`;
         const tagsInput = input("tags", S.Array(S.String))`Resource tags`;
-        const createTool = tool(
+        const createTool = Tool(
           "create",
         )`Creates resource following:${{ schema: SchemaFile }}. Takes ${nameInput} and ${tagsInput}.`(
           function* ({ name: _name, tags: _tags }) {},
@@ -1749,7 +1755,7 @@ pipeline:
         const idInput = input("id")`Unique identifier`;
         const countInput = input("count", S.Number)`Number of items`;
         const enabledInput = input("enabled", S.Boolean)`Whether enabled`;
-        const runTool = tool("run")`Runs with context:${{
+        const runTool = Tool("run")`Runs with context:${{
           config: ConfigFile,
           workers: [ProcessorAgent],
         }}. Takes ${idInput}, ${countInput}, ${enabledInput}.`(function* ({
@@ -1802,7 +1808,7 @@ pipeline:
         const targetInput = input("target")`Target to send to ${HelperAgent}`;
         const messageInput = input("message")`Message content`;
 
-        const sendTool = tool(
+        const sendTool = Tool(
           "send",
         )`Sends message. Takes ${targetInput} and ${messageInput}.`(function* ({
           target: _target,
@@ -1877,7 +1883,7 @@ Send tools: 🛠️send
         const dataInput = input("data")`Data formatted per ${FormatFile}`;
         const outputInput = input("outputPath")`Path to write output`;
 
-        const formatTool = tool(
+        const formatTool = Tool(
           "format",
         )`Formats data. Takes ${dataInput} and ${outputInput}.`(function* ({
           data: _data,
@@ -2098,7 +2104,7 @@ Format tools: 🛠️format
     Effect.gen(function* () {
       const inp = input("x")`Input`;
       const out = output("y")`Output`;
-      const myTool = tool("myTool")`Takes ${inp}, returns ${out}.`(function* ({
+      const myTool = Tool("myTool")`Takes ${inp}, returns ${out}.`(function* ({
         x,
       }) {
         return { y: x };
@@ -2332,7 +2338,7 @@ stages:
       Effect.gen(function* () {
         const inp = input("s")`String`;
         const out = output("r")`Result`;
-        const sharedTool = tool("sharedTool")`Takes ${inp}, returns ${out}.`(
+        const sharedTool = Tool("sharedTool")`Takes ${inp}, returns ${out}.`(
           function* ({ s }) {
             return { r: s };
           },
@@ -2390,7 +2396,7 @@ Tools: ${sharedTool}
     Effect.gen(function* () {
       const taskInput = input("task")`The task`;
       const taskOutput = output("result")`The result`;
-      const delegateTool = tool(
+      const delegateTool = Tool(
         "delegate",
       )`Delegates to ${() => HelperAgent}. Takes ${taskInput}. Returns ${taskOutput}.`(
         function* ({ task }) {
@@ -2419,7 +2425,7 @@ Tools: ${sharedTool}
       yield* fs.writeFileString("test/fixtures/schema-forward.json", "{}");
 
       const dataInput = input("data")`Data`;
-      const validateTool = tool(
+      const validateTool = Tool(
         "validate",
       )`Validates against ${() => SchemaFile}. Takes ${dataInput}.`(function* ({
         data: _,
@@ -2450,7 +2456,7 @@ Tools: ${sharedTool}
     Effect.gen(function* () {
       const inp = input("msg")`Message`;
       const out = output("result")`Result`;
-      const echoTool = tool("echo")`Echoes ${inp}. Returns ${out}.`(function* ({
+      const echoTool = Tool("echo")`Echoes ${inp}. Returns ${out}.`(function* ({
         msg,
       }) {
         return { result: msg };
@@ -2490,7 +2496,7 @@ Echo toolkit: 🛠️echo
     Effect.gen(function* () {
       const inp1 = input("a")`Input A`;
       const out1 = output("b")`Output B`;
-      const tool1 = tool("toolOne")`Takes ${inp1}. Returns ${out1}.`(
+      const tool1 = Tool("toolOne")`Takes ${inp1}. Returns ${out1}.`(
         function* ({ a }) {
           return { b: a };
         },
@@ -2498,7 +2504,7 @@ Echo toolkit: 🛠️echo
 
       const inp2 = input("c")`Input C`;
       const out2 = output("d")`Output D`;
-      const tool2 = tool("toolTwo")`Takes ${inp2}. Returns ${out2}.`(
+      const tool2 = Tool("toolTwo")`Takes ${inp2}. Returns ${out2}.`(
         function* ({ c }) {
           return { d: c };
         },
@@ -2546,7 +2552,7 @@ Has 🛠️toolTwo
     Effect.gen(function* () {
       const inp1 = input("x")`X`;
       const out1 = output("y")`Y`;
-      const refTool = tool("refTool")`Takes ${inp1}. Returns ${out1}.`(
+      const refTool = Tool("refTool")`Takes ${inp1}. Returns ${out1}.`(
         function* ({ x }) {
           return { y: x };
         },
@@ -2554,7 +2560,7 @@ Has 🛠️toolTwo
 
       const inp2 = input("p")`P`;
       const out2 = output("q")`Q`;
-      const addTool = tool("addTool")`Takes ${inp2}. Returns ${out2}.`(
+      const addTool = Tool("addTool")`Takes ${inp2}. Returns ${out2}.`(
         function* ({ p }) {
           return { q: p };
         },
@@ -2609,7 +2615,7 @@ Additional: 🛠️addTool
       Effect.gen(function* () {
         const inp = input("s")`String`;
         const out = output("r")`Result`;
-        const sharedTool = tool("sharedTool")`Takes ${inp}. Returns ${out}.`(
+        const sharedTool = Tool("sharedTool")`Takes ${inp}. Returns ${out}.`(
           function* ({ s }) {
             return { r: s };
           },
@@ -2807,7 +2813,7 @@ Shared: 🛠️sharedTool
   it.effect("excludes toolkits from transitive agents (depth > 1)", () =>
     Effect.gen(function* () {
       const codeInput = input("code")`The code to review`;
-      const reviewTool = tool("review")`Reviews ${codeInput}`(function* ({
+      const reviewTool = Tool("review")`Reviews ${codeInput}`(function* ({
         code: _,
       }) {});
 
@@ -2859,11 +2865,11 @@ Developer tools: ${reviewTool}
   it.effect("includes direct toolkit but excludes nested agent toolkit", () =>
     Effect.gen(function* () {
       const planInput = input("plan")`The plan`;
-      const planTool = tool("plan")`Creates ${planInput}`(function* ({
+      const planTool = Tool("plan")`Creates ${planInput}`(function* ({
         plan: _,
       }) {});
       const codeInput = input("code")`The code`;
-      const codeTool = tool("code")`Writes ${codeInput}`(function* ({
+      const codeTool = Tool("code")`Writes ${codeInput}`(function* ({
         code: _,
       }) {});
 
@@ -3467,7 +3473,7 @@ Members:
 
   it.effect("renders agent with role reference using & prefix", () =>
     Effect.gen(function* () {
-      const ReviewTool = tool("review")`Review code ${input("code", S.String)}`;
+      const ReviewTool = Tool("review")`Review code ${input("code", S.String)}`;
 
       class Reviewer extends Role("reviewer")`
 Code review capabilities.
@@ -3535,8 +3541,8 @@ Manages %{bob, carol}.
 
   it.effect("agent with role gets tools from role in context", () =>
     Effect.gen(function* () {
-      const ReviewTool = tool("review")`Review code ${input("code", S.String)}`;
-      const DeployTool = tool("deploy")`Deploy ${input("target", S.String)}`;
+      const ReviewTool = Tool("review")`Review code ${input("code", S.String)}`;
+      const DeployTool = Tool("deploy")`Deploy ${input("target", S.String)}`;
 
       class Reviewer extends Role("reviewer")`${ReviewTool}` {}
       class Deployer extends Role("deployer")`${DeployTool}` {}
@@ -3554,4 +3560,56 @@ ${Deployer}
       expect(ctx.toolkit).toBeDefined();
     }).pipe(Effect.provide(TestLayer)),
   );
+
+  describe("cwd placeholder", () => {
+    it("stringify resolves cwd with config", () => {
+      // Test without config (defaults to process.cwd())
+      expect(stringify(cwd)).toBe(process.cwd());
+
+      // Test with custom config
+      expect(stringify(cwd, { cwd: "/custom/test/path" })).toBe("/custom/test/path");
+      expect(stringify(cwd, { cwd: "/another/path" })).toBe("/another/path");
+    });
+
+    it("serialize resolves cwd with config", () => {
+      // Test without config (defaults to process.cwd())
+      expect(serialize(cwd)).toBe(process.cwd());
+
+      // Test with custom config
+      expect(serialize(cwd, { cwd: "/serialized/path" })).toBe("/serialized/path");
+    });
+
+    it("renderTemplate renders cwd in template strings with config", () => {
+      // Simulate template string: `Working in ${cwd}`
+      const template = ["Working in ", ""] as unknown as TemplateStringsArray;
+
+      // Test without config (defaults to process.cwd())
+      expect(renderTemplate(template, [cwd])).toBe(`Working in ${process.cwd()}`);
+
+      // Test with custom config
+      const result = renderTemplate(template, [cwd], { cwd: "/my/workspace" });
+      expect(result).toBe("Working in /my/workspace");
+    });
+
+    it("cwd placeholder works in tool descriptions with config", () => {
+      // Simulate: `The working directory. Defaults to ${cwd}.`
+      const template = [
+        "The working directory. Defaults to ",
+        ".",
+      ] as unknown as TemplateStringsArray;
+
+      const result = renderTemplate(template, [cwd], { cwd: "/tools/workspace" });
+      expect(result).toBe("The working directory. Defaults to /tools/workspace.");
+    });
+
+    it("isCwd correctly identifies cwd placeholder", () => {
+      expect(isCwd(cwd)).toBe(true);
+      expect(isCwd({ type: "cwd" })).toBe(true);
+      expect(isCwd({ type: "other" })).toBe(false);
+      expect(isCwd(null)).toBe(false);
+      expect(isCwd(undefined)).toBe(false);
+      expect(isCwd("cwd")).toBe(false);
+      expect(isCwd({})).toBe(false);
+    });
+  });
 });

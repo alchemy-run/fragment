@@ -28,6 +28,7 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import { isAgent, type Agent } from "../src/agent.ts";
+import { FragmentConfigLive } from "../src/config.ts";
 import { BunSqlite, sqliteStateStore } from "../src/state/index.ts";
 import { tui } from "../src/tui/index.tsx";
 import { logError } from "../src/util/log.ts";
@@ -148,11 +149,16 @@ const mainCommand = Command.make(
       Options.optional,
     ),
   },
-  Effect.fn(function* ({ config, model, cwd }) {
+  Effect.fn(function* ({ config, model, cwd: cwdOption }) {
+    // Resolve the working directory
+    const cwdPath = Option.getOrUndefined(cwdOption);
+    const resolvedCwd = cwdPath
+      ? require("path").resolve(cwdPath)
+      : process.cwd();
+
     // Change to the specified directory if provided
-    const cwdPath = Option.getOrUndefined(cwd);
     if (cwdPath) {
-      process.chdir(cwdPath);
+      process.chdir(resolvedCwd);
     }
 
     const configPath = Option.getOrUndefined(config);
@@ -180,7 +186,7 @@ const mainCommand = Command.make(
     // Collect all agents from the tree
     const allAgents = collectAgents(rootAgent);
 
-    // Create the layer with model + state store
+    // Create the layer with model + state store + config
     const modelLayer = getModelLayer(model);
     const stateStoreLayer = Layer.provideMerge(
       sqliteStateStore(),
@@ -189,7 +195,8 @@ const mainCommand = Command.make(
     // The model layer needs AnthropicClient, which needs HttpClient
     const anthropicLayer = Layer.provideMerge(Anthropic, NodeHttpClient.layer);
     const fullModelLayer = Layer.provideMerge(modelLayer, anthropicLayer);
-    const layer = Layer.merge(fullModelLayer, stateStoreLayer);
+    const configLayer = FragmentConfigLive({ cwd: resolvedCwd });
+    const layer = Layer.mergeAll(fullModelLayer, stateStoreLayer, configLayer);
 
     // Launch the TUI
     yield* Effect.tryPromise(() =>

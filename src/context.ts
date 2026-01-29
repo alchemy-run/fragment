@@ -12,19 +12,39 @@ import * as EffectToolkit from "@effect/ai/Toolkit";
 import * as FileSystem from "@effect/platform/FileSystem";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import { isAgent, type Agent } from "./agent.ts";
 import { isChannel } from "./chat/channel.ts";
 import { isGroupChat } from "./chat/group-chat.ts";
+import { FragmentConfig } from "./config.ts";
 import { isFile, type File } from "./file/file.ts";
+import {
+  isGitHubRepository,
+  isGitHubIssue,
+  isGitHubPullRequest,
+  isGitHubActions,
+  isGitHubClone,
+} from "./github/index.ts";
 import { isRole } from "./org/role.ts";
 import { isTool, type Tool } from "./tool/tool.ts";
 import { isToolkit, type Toolkit } from "./toolkit/toolkit.ts";
 import { collectReferences } from "./util/collect-references.ts";
+
+/**
+ * Check if a value is any GitHub fragment type.
+ */
+const isGitHubFragment = (value: unknown): boolean =>
+  isGitHubRepository(value) ||
+  isGitHubIssue(value) ||
+  isGitHubPullRequest(value) ||
+  isGitHubActions(value) ||
+  isGitHubClone(value);
 import {
   isThunk,
   renderTemplate,
   resolveThunk,
+  type RenderConfig,
   type Thunk,
 } from "./util/render-template.ts";
 
@@ -75,12 +95,18 @@ export const createContext: (
     const model = options?.model;
     const fs = yield* FileSystem.FileSystem;
 
+    // Get config from FragmentConfig layer (with fallback to process.cwd())
+    const renderConfig: RenderConfig = yield* Effect.serviceOption(
+      FragmentConfig,
+    ).pipe(Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))));
+
     const visited = new Set<string>();
     const agents: Array<{ id: string; content: string }> = [];
     const channels: Array<{ id: string; content: string }> = [];
     const groupChats: Array<{ id: string; content: string }> = [];
     const files: Array<FileEntry> = [];
     const toolkits: Array<{ id: string; content: string }> = [];
+    const github: Array<{ id: string; type: string; content: string }> = [];
 
     // Collect all references first (sync), then read files (async)
     const pendingFiles: Array<{ ref: File }> = [];
@@ -109,7 +135,7 @@ export const createContext: (
         if (depth <= 1) {
           agents.push({
             id: ref.id,
-            content: renderTemplate(ref.template, ref.references),
+            content: renderTemplate(ref.template, ref.references, renderConfig),
           });
         }
         // Do NOT recurse into agent references - transitive agents are accessed via tools
@@ -118,7 +144,7 @@ export const createContext: (
         if (depth <= 1) {
           channels.push({
             id: ref.id,
-            content: renderTemplate(ref.template, ref.references),
+            content: renderTemplate(ref.template, ref.references, renderConfig),
           });
           // Continue collecting from channel references (agents, files, etc.)
           ref.references.forEach((r: any) => collect(r, depth));
@@ -128,7 +154,7 @@ export const createContext: (
         if (depth <= 1) {
           groupChats.push({
             id: ref.id,
-            content: renderTemplate(ref.template, ref.references),
+            content: renderTemplate(ref.template, ref.references, renderConfig),
           });
           // Continue collecting from group chat references (agents, files, etc.)
           ref.references.forEach((r: any) => collect(r, depth));
@@ -145,7 +171,7 @@ export const createContext: (
         if (depth <= 1) {
           toolkits.push({
             id: ref.id,
-            content: renderTemplate(ref.template, ref.references).trim(),
+            content: renderTemplate(ref.template, ref.references, renderConfig).trim(),
           });
           // Continue collecting from toolkit references at same depth (for files, etc.)
           ref.references.forEach((r: any) => collect(r, depth));
@@ -156,11 +182,22 @@ export const createContext: (
         if (depth <= 1) {
           ref.references?.forEach((r: any) => collect(r, depth));
         }
+      } else if (isGitHubFragment(ref)) {
+        // Only embed GitHub fragments from direct references (depth=1)
+        if (depth <= 1) {
+          github.push({
+            id: ref.id,
+            type: ref.type,
+            content: renderTemplate(ref.template, ref.references, renderConfig),
+          });
+          // Continue collecting from GitHub fragment references at same depth
+          ref.references?.forEach((r: any) => collect(r, depth));
+        }
       }
     };
 
     // Render the root agent template
-    const rootContent = renderTemplate(agent.template, agent.references);
+    const rootContent = renderTemplate(agent.template, agent.references, renderConfig);
 
     // Collect all references from root at depth=1 (direct references)
     agent.references.forEach((r) => collect(r, 1));
@@ -172,7 +209,7 @@ export const createContext: (
         visited.add(key);
         toolkits.push({
           id: toolkit.id,
-          content: renderTemplate(toolkit.template, toolkit.references).trim(),
+          content: renderTemplate(toolkit.template, toolkit.references, renderConfig).trim(),
         });
       }
     }
@@ -185,7 +222,7 @@ export const createContext: (
       files.push({
         id: ref.id,
         language: ref.language,
-        description: renderTemplate(ref.template, ref.references),
+        description: renderTemplate(ref.template, ref.references, renderConfig),
         content,
       });
     }
@@ -209,6 +246,18 @@ export const createContext: (
       );
       systemParts.push(
         toolkits.map((t) => `### ${t.id}\n\n${t.content}`).join("\n\n"),
+      );
+      systemParts.push("\n");
+    }
+
+    if (github.length > 0) {
+      systemParts.push("\n\n---\n");
+      systemParts.push("\n## GitHub Resources\n\n");
+      systemParts.push(
+        "The following GitHub resources are available for reference:\n\n",
+      );
+      systemParts.push(
+        github.map((g) => `### ${g.id}\n\n${g.content}`).join("\n\n"),
       );
       systemParts.push("\n");
     }
@@ -350,7 +399,7 @@ export const createContext: (
     const effectToolkit =
       allToolkits.length > 0
         ? EffectToolkit.merge(
-            ...allToolkits.map((tk) => createEffectToolkit(tk, model)),
+            ...allToolkits.map((tk) => createEffectToolkit(tk, model, renderConfig)),
           )
         : EffectToolkit.empty;
 
@@ -677,13 +726,15 @@ export const collectToolkits = (agent: Agent): Toolkit[] =>
  *
  * @param toolkit - The distilled-code toolkit to convert
  * @param model - Optional model name to determine tool aliases
+ * @param config - Optional render config for resolving placeholders like cwd
  */
 export const createEffectToolkit = <T extends Toolkit>(
   toolkit: T,
   model?: string,
+  config?: RenderConfig,
 ): EffectToolkit.Toolkit<EffectToolkit.ToolsByName<EffectTool.Any[]>> => {
   const effectTools = toolkit.tools.map((tool) =>
-    createEffectTool(tool, model),
+    createEffectTool(tool, model, config),
   );
   return EffectToolkit.make(...effectTools);
 };
@@ -691,10 +742,15 @@ export const createEffectToolkit = <T extends Toolkit>(
 /**
  * Creates a handler layer from distilled-code toolkits.
  * This layer provides the handler implementations for the @effect/ai toolkit.
+ *
+ * @param toolkits - The distilled-code toolkits to create handlers for
+ * @param model - Optional model name to determine tool aliases
+ * @param config - Optional render config for resolving placeholders like cwd
  */
 export const createHandlerLayer = (
   toolkits: Toolkit[],
   model?: string,
+  config?: RenderConfig,
 ): Layer.Layer<EffectTool.Handler<string>, never, never> => {
   if (toolkits.length === 0) {
     return Layer.empty as any;
@@ -720,7 +776,7 @@ export const createHandlerLayer = (
 
   // Create the @effect/ai toolkit from all toolkits
   const effectToolkit = EffectToolkit.merge(
-    ...toolkits.map((tk) => createEffectToolkit(tk, model)),
+    ...toolkits.map((tk) => createEffectToolkit(tk, model, config)),
   );
 
   // Use toLayer to create the handler layer
@@ -733,13 +789,15 @@ export const createHandlerLayer = (
  *
  * @param tool - The distilled-code tool to convert
  * @param model - Optional model name to determine alias (e.g., "claude-3-5-sonnet")
+ * @param config - Optional render config for resolving placeholders like cwd
  */
 export const createEffectTool = <T extends Tool>(
   tool: T,
   model?: string,
+  config?: RenderConfig,
 ): EffectTool.Any => {
   // Render the description from the tool's template
-  const description = renderTemplate(tool.template, tool.references);
+  const description = renderTemplate(tool.template, tool.references, config);
 
   // Get the input schema fields - tool.input is a Schema.Struct created by deriveSchema
   // We need to extract the fields from it

@@ -4,6 +4,7 @@ import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import * as Stream from "effect/Stream";
+import { cwd, FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import { CommandValidator } from "../util/command-validator.ts";
@@ -19,7 +20,7 @@ const timeout = input(
 const workdir = input(
   "workdir",
   S.optional(S.String),
-)`The working directory to run the command in. Defaults to ${process.cwd()}. Use this instead of 'cd' commands.`;
+)`The working directory to run the command in. Defaults to ${cwd}. Use this instead of 'cd' commands.`;
 
 const description = input(
   "description",
@@ -45,7 +46,7 @@ export const bash = Tool("bash", {
 Returns the ${exitCode} and ${out} containing both stdout and stderr.
 If the command is invalid, an error will be returned as a ${S.String}
 
-All commands run in ${process.cwd()} by default. Use the ${workdir} parameter if you need to run a command in a different directory. AVOID using \`cd <directory> && <command>\` patterns - use \`workdir\` instead.
+All commands run in ${cwd} by default. Use the ${workdir} parameter if you need to run a command in a different directory. AVOID using \`cd <directory> && <command>\` patterns - use \`workdir\` instead.
 
 IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
 
@@ -160,6 +161,9 @@ Important:
 # Other common operations
 - View comments on a Github PR: gh api repos/foo/bar/pulls/123/comments
 `(function* ({ command, workdir }) {
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const validator = yield* Effect.serviceOption(CommandValidator).pipe(
     Effect.map(Option.getOrUndefined),
   );
@@ -177,7 +181,7 @@ Important:
 
   const cmd = Command.make(command).pipe(
     Command.runInShell(true),
-    Command.workingDirectory(workdir ?? process.cwd()),
+    Command.workingDirectory(workdir ?? config.cwd),
   );
 
   const [exitCode, output] = yield* pipe(

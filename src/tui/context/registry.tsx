@@ -1,7 +1,7 @@
 /**
  * Agent Registry Context
  *
- * Provides available agent, channel, and group chat definitions to the TUI components.
+ * Provides available agent, channel, group chat, and GitHub definitions to the TUI components.
  * Automatically discovers all entities from the reference graph.
  */
 
@@ -9,6 +9,7 @@ import { createContext, useContext, type JSX } from "solid-js";
 import type { Agent } from "../../agent.ts";
 import type { Channel } from "../../chat/channel.ts";
 import type { GroupChat } from "../../chat/group-chat.ts";
+import type { Fragment } from "../../fragment.ts";
 import { discoverOrg } from "../util/discover-org.ts";
 
 /**
@@ -31,6 +32,11 @@ export interface RegistryContextValue {
   groupChats: GroupChat[];
 
   /**
+   * Available GitHub fragment definitions (all discovered GitHub fragments)
+   */
+  github: Fragment<string, string, any[]>[];
+
+  /**
    * Get an agent by ID
    */
   getAgent: (id: string) => Agent | undefined;
@@ -44,6 +50,11 @@ export interface RegistryContextValue {
    * Get a group chat by ID
    */
   getGroupChat: (id: string) => GroupChat | undefined;
+
+  /**
+   * Get a GitHub fragment by ID
+   */
+  getGitHub: (id: string) => Fragment<string, string, any[]> | undefined;
 }
 
 const RegistryContext = createContext<RegistryContextValue>();
@@ -67,7 +78,7 @@ export interface RegistryProviderProps {
  * Provider component for agent registry.
  *
  * Automatically walks the reference graph starting from the provided agents
- * to discover ALL entities (agents, channels, group chats) in the system.
+ * to discover ALL entities (agents, channels, group chats, GitHub fragments) in the system.
  */
 export function RegistryProvider(props: RegistryProviderProps) {
   // Discover all entities from the reference graph
@@ -88,13 +99,20 @@ export function RegistryProvider(props: RegistryProviderProps) {
     groupChatMap.set(groupChat.id, groupChat);
   }
 
+  const githubMap = new Map<string, Fragment<string, string, any[]>>();
+  for (const fragment of org.github) {
+    githubMap.set(fragment.id, fragment);
+  }
+
   const value: RegistryContextValue = {
     agents: org.agents,
     channels: org.channels,
     groupChats: org.groupChats,
+    github: org.github,
     getAgent: (id: string) => agentMap.get(id),
     getChannel: (id: string) => channelMap.get(id),
     getGroupChat: (id: string) => groupChatMap.get(id),
+    getGitHub: (id: string) => githubMap.get(id),
   };
 
   return (

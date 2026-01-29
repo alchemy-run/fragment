@@ -1,6 +1,8 @@
 import * as Path from "@effect/platform/Path";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import { formatDiagnostic } from "../lsp/diagnostics.ts";
 import { LSPManager } from "../lsp/index.ts";
@@ -30,11 +32,14 @@ Given optional ${paths}:
 `(function* ({ paths: inputPaths }) {
   yield* Effect.logDebug(`[readlints] paths=${JSON.stringify(inputPaths)}`);
 
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const pathService = yield* Path.Path;
   const lspManager = yield* LSPManager;
 
   const resolvedPaths = (inputPaths ?? []).map((p) =>
-    pathService.isAbsolute(p) ? p : pathService.join(process.cwd(), p),
+    pathService.isAbsolute(p) ? p : pathService.join(config.cwd, p),
   );
 
   // Get diagnostics for each path

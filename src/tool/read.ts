@@ -1,7 +1,9 @@
 import * as FileSystem from "@effect/platform/FileSystem";
 import * as Path from "@effect/platform/Path";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { FragmentConfig } from "../config.ts";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import { Tool } from "./tool.ts";
@@ -35,6 +37,9 @@ Given a ${filePath} and optional ${offset} and ${limit}:
 `(function* ({ filePath: _filePath, offset: _offset, limit: _limit }) {
   yield* Effect.logDebug(`[read] filePath=${_filePath}`);
 
+  const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+    Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+  );
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
@@ -49,7 +54,7 @@ Given a ${filePath} and optional ${offset} and ${limit}:
 
   const filePath = path.isAbsolute(_filePath)
     ? _filePath
-    : path.join(process.cwd(), _filePath);
+    : path.join(config.cwd, _filePath);
 
   const exists = yield* fs
     .exists(filePath)

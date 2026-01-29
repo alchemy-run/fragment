@@ -6,8 +6,7 @@
 
 import { useTerminalDimensions } from "@opentui/solid";
 import { createSignal, type JSX } from "solid-js";
-import type { ChannelType } from "../../state/thread.ts";
-import { Sidebar, type SidebarSelection } from "./sidebar/sidebar.tsx";
+import { Sidebar, type SidebarSelection, type SidebarSelectionType } from "./sidebar/sidebar.tsx";
 
 export interface AppLayoutProps {
   /**
@@ -73,7 +72,7 @@ export function AppLayout(props: AppLayoutProps) {
  * Hook to get the current channel type and ID from selection
  */
 export function useChannelInfo(selection: SidebarSelection | undefined): {
-  channelType: ChannelType | undefined;
+  channelType: SidebarSelectionType | undefined;
   channelId: string | undefined;
 } {
   if (!selection) {

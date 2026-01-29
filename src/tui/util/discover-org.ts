@@ -1,16 +1,36 @@
 /**
  * Utility to recursively discover all organization entities from a root agent or list of agents.
  *
- * Walks the entire reference graph to find all Agents, Channels, GroupChats, Roles, and Groups.
+ * Walks the entire reference graph to find all Agents, Channels, GroupChats, Roles, Groups,
+ * and GitHub fragments.
  */
 
 import { isAgent, type Agent } from "../../agent.ts";
 import { isChannel, type Channel } from "../../chat/channel.ts";
 import { isGroupChat, type GroupChat } from "../../chat/group-chat.ts";
-import { isFragment } from "../../fragment.ts";
+import { isFragment, type Fragment } from "../../fragment.ts";
+import {
+  isGitHubRepository,
+  isGitHubIssue,
+  isGitHubPullRequest,
+  isGitHubActions,
+  isGitHubClone,
+} from "../../github/index.ts";
 import { isGroup, type Group } from "../../org/group.ts";
 import { isRole, type Role } from "../../org/role.ts";
 import { resolveThunk } from "../../util/render-template.ts";
+
+/**
+ * Check if a fragment is a GitHub fragment.
+ */
+export const isGitHubFragment = (
+  x: unknown,
+): x is Fragment<string, string, any[]> =>
+  isGitHubRepository(x) ||
+  isGitHubIssue(x) ||
+  isGitHubPullRequest(x) ||
+  isGitHubActions(x) ||
+  isGitHubClone(x);
 
 /**
  * Result of discovering all organization entities from the reference graph.
@@ -40,6 +60,11 @@ export interface DiscoveredOrg {
    * All discovered groups, sorted by ID.
    */
   groups: Group[];
+
+  /**
+   * All discovered GitHub fragments, sorted by ID.
+   */
+  github: Fragment<string, string, any[]>[];
 }
 
 /**
@@ -67,6 +92,7 @@ export function discoverOrg(roots: Agent | Agent[]): DiscoveredOrg {
   const groupChats = new Map<string, GroupChat>();
   const roles = new Map<string, Role>();
   const groups = new Map<string, Group>();
+  const github = new Map<string, Fragment<string, string, any[]>>();
   const visited = new Set<unknown>();
 
   const queue: unknown[] = Array.isArray(roots) ? [...roots] : [roots];
@@ -141,6 +167,17 @@ export function discoverOrg(roots: Agent | Agent[]): DiscoveredOrg {
       continue;
     }
 
+    // If it's a GitHub fragment, add it and queue its references
+    if (isGitHubFragment(resolved)) {
+      if (!github.has(resolved.id)) {
+        github.set(resolved.id, resolved);
+      }
+      for (const ref of resolved.references) {
+        queue.push(ref);
+      }
+      continue;
+    }
+
     // If it's any other Fragment, queue its references
     if (isFragment(resolved)) {
       for (const ref of resolved.references) {
@@ -178,6 +215,9 @@ export function discoverOrg(roots: Agent | Agent[]): DiscoveredOrg {
     ),
     roles: Array.from(roles.values()).sort((a, b) => a.id.localeCompare(b.id)),
     groups: Array.from(groups.values()).sort((a, b) =>
+      a.id.localeCompare(b.id),
+    ),
+    github: Array.from(github.values()).sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
   };

@@ -1,10 +1,12 @@
-import * as Effect from "effect/Effect";
 import * as Command from "@effect/platform/Command";
 import { CommandExecutor } from "@effect/platform/CommandExecutor";
-import { loadParser } from "../util/parser.ts";
-import * as Context from "effect/Context";
-import * as Layer from "effect/Layer";
 import * as Path from "@effect/platform/Path";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import { FragmentConfig } from "../config.ts";
+import { loadParser } from "../util/parser.ts";
 
 export class CommandValidator extends Context.Tag("CommandValidator")<
   CommandValidator,
@@ -69,11 +71,13 @@ export const commandValidator = Layer.effect(
               );
 
               if (resolved) {
-                const cwd = process.cwd();
-                const relative = path.relative(cwd, resolved);
+                const config = yield* Effect.serviceOption(FragmentConfig).pipe(
+                  Effect.map(Option.getOrElse(() => ({ cwd: process.cwd() }))),
+                );
+                const relative = path.relative(config.cwd, resolved);
                 if (relative.startsWith("..")) {
                   return yield* Effect.fail(
-                    `Cannot ${command[0]} file: ${arg} is outside the current working directory: ${cwd}`,
+                    `Cannot ${command[0]} file: ${arg} is outside the current working directory: ${config.cwd}`,
                   );
                 }
               }

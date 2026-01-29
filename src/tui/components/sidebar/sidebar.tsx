@@ -1,20 +1,28 @@
 /**
  * Sidebar Component
  *
- * Discord-like sidebar with collapsible sections for DMs, Groups, and Channels.
+ * Discord-like sidebar with collapsible sections for DMs, Groups, Channels, and GitHub.
  */
 
+import { Show } from "solid-js";
 import type { ChannelType } from "../../../state/thread.ts";
+import { GitHubSidebar } from "../../../github/tui/sidebar.tsx";
+import { useRegistry } from "../../context/registry.tsx";
 import { ChannelList } from "./channel-list.tsx";
 import { DMList } from "./dm-list.tsx";
 import { GroupList } from "./group-list.tsx";
 import { Section } from "./section.tsx";
 
 /**
+ * Extended selection type including GitHub fragments.
+ */
+export type SidebarSelectionType = ChannelType | "github";
+
+/**
  * Selection state for the sidebar
  */
 export interface SidebarSelection {
-  type: ChannelType;
+  type: SidebarSelectionType;
   id: string;
 }
 
@@ -37,10 +45,11 @@ export interface SidebarProps {
 }
 
 /**
- * Discord-like sidebar with DMs, Groups, and Channels sections
+ * Discord-like sidebar with DMs, Groups, Channels, and GitHub sections
  */
 export function Sidebar(props: SidebarProps) {
   const width = () => props.width ?? 30;
+  const registry = useRegistry();
 
   const handleSelectAgent = (agentId: string) => {
     props.onSelect?.({ type: "dm", id: agentId });
@@ -54,6 +63,10 @@ export function Sidebar(props: SidebarProps) {
     props.onSelect?.({ type: "channel", id: channelId });
   };
 
+  const handleSelectGitHub = (id: string, _type: string) => {
+    props.onSelect?.({ type: "github", id });
+  };
+
   const selectedAgentId = () =>
     props.selection?.type === "dm" ? props.selection.id : undefined;
 
@@ -62,6 +75,9 @@ export function Sidebar(props: SidebarProps) {
 
   const selectedChannelId = () =>
     props.selection?.type === "channel" ? props.selection.id : undefined;
+
+  const selectedGitHubId = () =>
+    props.selection?.type === "github" ? props.selection.id : undefined;
 
   return (
     <box
@@ -94,6 +110,17 @@ export function Sidebar(props: SidebarProps) {
           onSelectChannel={handleSelectChannel}
         />
       </Section>
+
+      {/* GitHub Section - only show if there are GitHub fragments */}
+      <Show when={registry.github.length > 0}>
+        <Section title="GitHub">
+          <GitHubSidebar
+            fragments={registry.github}
+            selectedId={selectedGitHubId()}
+            onSelect={handleSelectGitHub}
+          />
+        </Section>
+      </Show>
     </box>
   );
 }

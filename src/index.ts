@@ -1,7 +1,9 @@
 export * from "./agent.ts";
 export * as Chat from "./chat/index.ts";
+export { cwd, FragmentConfig, FragmentConfigLive } from "./config.ts";
 export * as File from "./file/index.ts";
 export * from "./fragment.ts";
+export * as GitHub from "./github/index.ts";
 export * from "./input.ts";
 export * from "./messaging-service.ts";
 export * as Org from "./org/index.ts";

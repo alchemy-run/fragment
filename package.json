@@ -38,6 +38,11 @@
       "bun": "./src/tui/index.tsx",
       "types": "./lib/tui/index.d.ts",
       "default": "./lib/tui/index.js"
+    },
+    "./github": {
+      "bun": "./src/github/index.ts",
+      "types": "./lib/github/index.d.ts",
+      "default": "./lib/github/index.js"
     }
   },
   "publishConfig": {
