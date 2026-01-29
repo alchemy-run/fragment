@@ -8,41 +8,15 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
 import * as yaml from "yaml";
-import { isAgent, type Agent } from "../agent.ts";
-import { isChannel, type Channel } from "../chat/channel.ts";
-import { isGroupChat, type GroupChat } from "../chat/group-chat.ts";
 import { FragmentConfig, isCwd } from "../config.ts";
-import { isFile } from "../file/file.ts";
 import {
-  isGitHubRepository,
-  isGitHubIssue,
-  isGitHubPullRequest,
-  isGitHubActions,
-  isGitHubClone,
-} from "../github/index.ts";
-import { isInput } from "../input.ts";
-import { isGroup, type Group } from "../org/group.ts";
-import { isRole, type Role } from "../org/role.ts";
-import { isOutput } from "../output.ts";
-import { isTool } from "../tool/tool.ts";
-import { isToolkit } from "../toolkit/toolkit.ts";
+  isFragment,
+  type Fragment,
+  type RenderConfig,
+} from "../fragment.ts";
 
-/**
- * Check if a value is any GitHub fragment type.
- */
-export const isGitHubFragment = (value: unknown): boolean =>
-  isGitHubRepository(value) ||
-  isGitHubIssue(value) ||
-  isGitHubPullRequest(value) ||
-  isGitHubActions(value) ||
-  isGitHubClone(value);
-
-/**
- * Configuration for template rendering.
- */
-export interface RenderConfig {
-  readonly cwd: string;
-}
+// Re-export RenderConfig for backwards compatibility
+export type { RenderConfig } from "../fragment.ts";
 
 /**
  * A thunk is a function that returns a reference, enabling forward references.
@@ -53,23 +27,14 @@ export type Thunk<T = unknown> = () => T;
  * Checks if a value is a thunk (a function that returns a reference).
  * Thunks are zero-argument arrow functions that return references.
  * They are distinguished from other function-like constructs by:
- * - Not being agents, channels, groups, files, toolkits, tools, inputs, outputs, GitHub fragments, or Effect Schemas
+ * - Not being fragments (agents, channels, groups, files, etc.)
+ * - Not being Effect Schemas
  * - Having no arguments (length === 0)
  */
 export const isThunk = (value: unknown): value is Thunk =>
   typeof value === "function" &&
   (value as Function).length === 0 &&
-  !isAgent(value) &&
-  !isChannel(value) &&
-  !isGroupChat(value) &&
-  !isRole(value) &&
-  !isGroup(value) &&
-  !isFile(value) &&
-  !isToolkit(value) &&
-  !isTool(value) &&
-  !isInput(value) &&
-  !isOutput(value) &&
-  !isGitHubFragment(value) &&
+  !isFragment(value) &&
   !S.isSchema(value);
 
 /**
@@ -77,6 +42,37 @@ export const isThunk = (value: unknown): value is Thunk =>
  */
 export const resolveThunk = <T>(value: T | Thunk<T>): T =>
   isThunk(value) ? value() : value;
+
+/**
+ * Create a version of a fragment with pre-resolved references.
+ * This allows render.context functions to use type guards like isAgent directly.
+ */
+function resolveFragmentReferences<T extends Fragment<string, string, any[]>>(
+  fragment: T,
+): T {
+  const resolvedRefs = fragment.references.map(resolveThunk);
+  return Object.assign(Object.create(Object.getPrototypeOf(fragment)), fragment, {
+    references: resolvedRefs,
+  });
+}
+
+/**
+ * Stringify a fragment using its render.context function.
+ * Pre-resolves references so the context function can use type guards directly.
+ */
+function stringifyFragment(
+  fragment: Fragment<string, string, any[]>,
+  config?: RenderConfig,
+): string {
+  const frag = fragment as any;
+  if (frag.render?.context) {
+    // Pre-resolve references so context function can use type guards
+    const resolved = resolveFragmentReferences(fragment);
+    return frag.render.context(resolved, config);
+  }
+  // Fallback for fragments without custom render.context
+  return `{${frag.type}:${frag.id}}`;
+}
 
 /**
  * Recursively serialize a value, replacing references with their string representations.
@@ -92,60 +88,10 @@ export function serialize(rawValue: unknown, config?: RenderConfig): unknown {
   // Handle cwd placeholder - resolve to actual cwd value
   if (isCwd(value)) return config?.cwd ?? process.cwd();
 
-  // Handle Agent, Channel, GroupChat, Role, Group, File, GitHub, Toolkit, Tool, Input, Output references
-  // These can be classes (functions) so check before typeof checks
-  if (isAgent(value)) return `@${value.id}`;
-  if (isChannel(value)) return `#${value.id}`;
-  if (isGroupChat(value)) {
-    // Extract agent members from references and format as @{member1, member2}
-    const members = value.references
-      .filter((ref: unknown) => isAgent(resolveThunk(ref)))
-      .map((ref: unknown) => (resolveThunk(ref) as Agent).id);
-    return members.length > 0 ? `@{${members.join(", ")}}` : `@{${value.id}}`;
+  // Handle any fragment type with self-describing render
+  if (isFragment(value)) {
+    return stringifyFragment(value, config);
   }
-  if (isRole(value)) return `&${value.id}`;
-  if (isGroup(value)) {
-    // Extract agent members from references and format as %{member1, member2}
-    const members = value.references
-      .filter((ref: unknown) => isAgent(resolveThunk(ref)))
-      .map((ref: unknown) => (resolveThunk(ref) as Agent).id);
-    return members.length > 0 ? `%{${members.join(", ")}}` : `%${value.id}`;
-  }
-  if (isFile(value)) {
-    const filename = value.id.split("/").pop() || value.id;
-    return `[${filename}](${value.id})`;
-  }
-  // GitHub fragments - use specific icons for each type
-  if (isGitHubRepository(value)) {
-    const props = value as any;
-    return `📦${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubIssue(value)) {
-    const props = value as any;
-    if (props.number) {
-      return `🐛${props.owner ?? ""}/${props.repo ?? ""}#${props.number}`;
-    }
-    return `🐛${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubPullRequest(value)) {
-    const props = value as any;
-    if (props.number) {
-      return `🔀${props.owner ?? ""}/${props.repo ?? ""}#${props.number}`;
-    }
-    return `🔀${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubActions(value)) {
-    const props = value as any;
-    return `⚡${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubClone(value)) {
-    const props = value as any;
-    return `📂${props.path ?? value.id}`;
-  }
-  if (isToolkit(value)) return `🧰${value.id}`;
-  if (isTool(value)) return `🛠️${value.id}`;
-  if (isInput(value)) return `\${${value.id}}`;
-  if (isOutput(value)) return `^{${value.id}}`;
 
   // Handle primitives and functions
   if (value === null || value === undefined) return value;
@@ -176,16 +122,7 @@ export function serialize(rawValue: unknown, config?: RenderConfig): unknown {
  * Stringifies a value for use in agent context.
  * - Primitives: converted to string
  * - Arrays/Sets/Objects: serialized to YAML
- * - Agent: @{id} reference link
- * - Channel: #{id} channel reference
- * - GroupChat: @{member1, member2} group chat reference
- * - Role: &{id} role reference
- * - Group: %{member1, member2} or %{id} group reference
- * - File: [filename](path) markdown link
- * - Toolkit: 🧰{id}
- * - Tool: 🛠️{id}
- * - Input: ${id}
- * - Output: ^{id}
+ * - Fragments: rendered using their render.context function
  * - Thunk: resolved to its actual value first
  *
  * @param rawValue - The value to stringify
@@ -198,59 +135,10 @@ export function stringify(rawValue: unknown, config?: RenderConfig): string {
   // Handle cwd placeholder - resolve to actual cwd value
   if (isCwd(value)) return config?.cwd ?? process.cwd();
 
-  // Handle Agent, Channel, GroupChat, Role, Group, File, GitHub, Toolkit, Tool, Input, Output references
-  if (isAgent(value)) return `@${value.id}`;
-  if (isChannel(value)) return `#${value.id}`;
-  if (isGroupChat(value)) {
-    // Extract agent members from references and format as @{member1, member2}
-    const members = value.references
-      .filter((ref: unknown) => isAgent(resolveThunk(ref)))
-      .map((ref: unknown) => (resolveThunk(ref) as Agent).id);
-    return members.length > 0 ? `@{${members.join(", ")}}` : `@{${value.id}}`;
+  // Handle any fragment type with self-describing render
+  if (isFragment(value)) {
+    return stringifyFragment(value, config);
   }
-  if (isRole(value)) return `&${value.id}`;
-  if (isGroup(value)) {
-    // Extract agent members from references and format as %{member1, member2}
-    const members = value.references
-      .filter((ref: unknown) => isAgent(resolveThunk(ref)))
-      .map((ref: unknown) => (resolveThunk(ref) as Agent).id);
-    return members.length > 0 ? `%{${members.join(", ")}}` : `%${value.id}`;
-  }
-  if (isFile(value)) {
-    const filename = value.id.split("/").pop() || value.id;
-    return `[${filename}](${value.id})`;
-  }
-  // GitHub fragments - use specific icons for each type
-  if (isGitHubRepository(value)) {
-    const props = value as any;
-    return `📦${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubIssue(value)) {
-    const props = value as any;
-    if (props.number) {
-      return `🐛${props.owner ?? ""}/${props.repo ?? ""}#${props.number}`;
-    }
-    return `🐛${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubPullRequest(value)) {
-    const props = value as any;
-    if (props.number) {
-      return `🔀${props.owner ?? ""}/${props.repo ?? ""}#${props.number}`;
-    }
-    return `🔀${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubActions(value)) {
-    const props = value as any;
-    return `⚡${props.owner ?? ""}/${props.repo ?? value.id}`;
-  }
-  if (isGitHubClone(value)) {
-    const props = value as any;
-    return `📂${props.path ?? value.id}`;
-  }
-  if (isToolkit(value)) return `🧰${value.id}`;
-  if (isTool(value)) return `🛠️${value.id}`;
-  if (isInput(value)) return `\${${value.id}}`;
-  if (isOutput(value)) return `^{${value.id}}`;
 
   // Handle primitives
   if (value === null) return "null";
@@ -300,36 +188,19 @@ export const renderTemplateEffect = (
   });
 
 /**
- * Renders an agent's template to a displayable string.
+ * Renders a fragment's template to a displayable string.
+ * Works for any fragment type (Agent, Channel, GroupChat, Role, Group, etc.)
  */
-export function renderAgentTemplate(agent: Agent, config?: RenderConfig): string {
-  return renderTemplate(agent.template, agent.references, config);
+export function renderFragmentTemplate(
+  fragment: Fragment<string, string, any[]>,
+  config?: RenderConfig,
+): string {
+  return renderTemplate(fragment.template, fragment.references, config);
 }
 
-/**
- * Renders a channel's template to a displayable string.
- */
-export function renderChannelTemplate(channel: Channel, config?: RenderConfig): string {
-  return renderTemplate(channel.template, channel.references, config);
-}
-
-/**
- * Renders a group chat's template to a displayable string.
- */
-export function renderGroupChatTemplate(groupChat: GroupChat, config?: RenderConfig): string {
-  return renderTemplate(groupChat.template, groupChat.references, config);
-}
-
-/**
- * Renders a role's template to a displayable string.
- */
-export function renderRoleTemplate(role: Role, config?: RenderConfig): string {
-  return renderTemplate(role.template, role.references, config);
-}
-
-/**
- * Renders a group's template to a displayable string.
- */
-export function renderGroupTemplate(group: Group, config?: RenderConfig): string {
-  return renderTemplate(group.template, group.references, config);
-}
+// Backwards compatibility aliases
+export const renderAgentTemplate = renderFragmentTemplate;
+export const renderChannelTemplate = renderFragmentTemplate;
+export const renderGroupChatTemplate = renderFragmentTemplate;
+export const renderRoleTemplate = renderFragmentTemplate;
+export const renderGroupTemplate = renderFragmentTemplate;

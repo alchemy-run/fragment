@@ -1,4 +1,5 @@
 import { defineFragment, type Fragment } from "../fragment.ts";
+import { ChannelContent } from "./tui/channel-content.tsx";
 
 /**
  * Channel type - a named channel with multiple participants defined via template.
@@ -46,7 +47,15 @@ export interface Channel<
  * ` {}
  * ```
  */
-export const Channel = defineFragment("channel")();
+export const Channel = defineFragment("channel")({
+  render: {
+    context: (channel: Channel) => `#${channel.id}`,
+    tui: {
+      content: ChannelContent,
+      focusable: true,
+    },
+  },
+});
 
 /**
  * Type guard for Channel entities

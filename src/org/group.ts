@@ -1,4 +1,5 @@
 import { defineFragment, type Fragment } from "../fragment.ts";
+import { isAgent } from "../agent.ts";
 
 /**
  * Group type - an organizational unit containing agents.
@@ -54,7 +55,15 @@ export interface Group<
  * // Channel participants: Alice, Bob (expanded from Engineering)
  * ```
  */
-export const Group = defineFragment("group")();
+export const Group = defineFragment("group")({
+  render: {
+    context: (group: Group) => {
+      // References are pre-resolved, so we can use isAgent directly
+      const members = group.references.filter(isAgent).map((a) => a.id);
+      return members.length > 0 ? `%{${members.join(", ")}}` : `%${group.id}`;
+    },
+  },
+});
 
 /**
  * Type guard for Group entities

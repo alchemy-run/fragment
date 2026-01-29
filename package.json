@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run",
+    "test": "bun test ./test",
     "test:tui": "bun test --preload @opentui/solid/preload ./test/tui/ --",
     "test:tui:update": "bun test --preload @opentui/solid/preload ./test/tui/ --update-snapshots",
     "test:watch": "vitest",

@@ -72,6 +72,9 @@ export const output = <
     schema,
     template,
     references,
+    render: {
+      context: (output: Output<any, any, any[]>) => `^{${output.id}}`,
+    },
   });
   const output = (template: TemplateStringsArray, ...references: any[]) =>
     Object.assign(output, props(template, references));

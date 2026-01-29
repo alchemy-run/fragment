@@ -79,6 +79,9 @@ export const Tool =
       references,
       template,
       handler: Effect.fn(handler),
+      render: {
+        context: (tool: Tool) => `🛠️${tool.id}`,
+      },
     }) as any as Tool<
       ID,
       {

@@ -43,7 +43,11 @@ export interface Role<
  * ` {}
  * ```
  */
-export const Role = defineFragment("role")();
+export const Role = defineFragment("role")({
+  render: {
+    context: (role: Role) => `&${role.id}`,
+  },
+});
 
 /**
  * Type guard for Role entities

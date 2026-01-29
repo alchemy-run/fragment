@@ -231,10 +231,13 @@ process.on("unhandledRejection", (reason) => {
 });
 
 Effect.gen(function* () {
-  const dotEnvProvider = yield* PlatformConfigProvider.fromDotEnv(".env").pipe(
+  // Load .env file and combine with environment variables
+  // Priority: .env values take precedence, then fall back to process.env
+  const configProvider = yield* PlatformConfigProvider.fromDotEnv(".env").pipe(
+    Effect.map((dotEnv) => ConfigProvider.orElse(dotEnv, ConfigProvider.fromEnv)),
     Effect.catchAll(() => Effect.succeed(ConfigProvider.fromEnv())),
   );
-  yield* cli(process.argv).pipe(Effect.withConfigProvider(dotEnvProvider));
+  yield* cli(process.argv).pipe(Effect.withConfigProvider(configProvider));
 }).pipe(
   Logger.withMinimumLogLevel(
     process.env.DEBUG ? LogLevel.Debug : LogLevel.Info,

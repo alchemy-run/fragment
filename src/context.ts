@@ -21,9 +21,6 @@ import { FragmentConfig } from "./config.ts";
 import { isFile, type File } from "./file/file.ts";
 import {
   isGitHubRepository,
-  isGitHubIssue,
-  isGitHubPullRequest,
-  isGitHubActions,
   isGitHubClone,
 } from "./github/index.ts";
 import { isRole } from "./org/role.ts";
@@ -36,9 +33,6 @@ import { collectReferences } from "./util/collect-references.ts";
  */
 const isGitHubFragment = (value: unknown): boolean =>
   isGitHubRepository(value) ||
-  isGitHubIssue(value) ||
-  isGitHubPullRequest(value) ||
-  isGitHubActions(value) ||
   isGitHubClone(value);
 import {
   isThunk,

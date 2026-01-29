@@ -11,19 +11,36 @@ import "./parsers/init.ts";
 
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import type { Fragment, FragmentRender } from "../fragment.ts";
 import type { ChannelType } from "../state/thread.ts";
-import { ChatView } from "./components/chat-view.tsx";
 import { DocumentView } from "./components/document-view.tsx";
-import { MembersSidebar } from "./components/members-sidebar.tsx";
 import { useRegistry } from "./context/registry.tsx";
 import { useStore } from "./context/store.tsx";
 import { ThemeProvider } from "./context/theme.tsx";
 
 /**
+ * Get the render config for a fragment.
+ * Handles both own properties and inherited static properties.
+ */
+function getFragmentRender(fragment: any): FragmentRender<any> | undefined {
+  if (fragment.render) {
+    return fragment.render;
+  }
+  let proto = Object.getPrototypeOf(fragment);
+  while (proto) {
+    if (proto.render) {
+      return proto.render;
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return undefined;
+}
+
+/**
  * Selection state for sidebar items
  */
 interface Selection {
-  type: ChannelType;
+  type: ChannelType | "github";
   id: string;
 }
 
@@ -31,7 +48,7 @@ interface Selection {
  * Navigation item for the sidebar
  */
 interface NavItem {
-  type: ChannelType | "header";
+  type: ChannelType | "github" | "header";
   id: string;
   label: string;
 }
@@ -97,6 +114,24 @@ export function App() {
       }
     }
 
+    // GitHub Repositories section (only repositories, not clones)
+    const repos = registry.github.filter((f) => f.type === "github-repository");
+    if (repos.length > 0) {
+      items.push({
+        type: "header",
+        id: "header-github",
+        label: "GitHub",
+      });
+      for (const fragment of repos) {
+        const props = fragment as any;
+        items.push({
+          type: "github",
+          id: fragment.id,
+          label: props.repo ?? fragment.id,
+        });
+      }
+    }
+
     return items;
   });
 
@@ -120,7 +155,7 @@ export function App() {
     const index = selectedIndex();
     if (index >= 0 && index < items.length) {
       const item = items[index];
-      return { type: item.type as ChannelType, id: item.id };
+      return { type: item.type as ChannelType | "github", id: item.id };
     }
     return undefined;
   });
@@ -135,18 +170,42 @@ export function App() {
     return undefined;
   });
 
+  // Get the selected fragment (for all item types)
+  const selectedFragment = createMemo<Fragment<string, string, any[]> | undefined>(() => {
+    const sel = currentSelection();
+    if (!sel) return undefined;
+    switch (sel.type) {
+      case "dm":
+        return registry.agents.find((a) => a.id === sel.id);
+      case "channel":
+        return registry.channels.find((c) => c.id === sel.id);
+      case "group":
+        return registry.groupChats.find((g) => g.id === sel.id);
+      case "github":
+        return registry.github.find((f) => f.id === sel.id);
+      default:
+        return undefined;
+    }
+  });
+
+  // Get the render config for the selected fragment
+  const selectedRender = createMemo(() => {
+    const fragment = selectedFragment();
+    if (!fragment) return undefined;
+    return getFragmentRender(fragment);
+  });
+
+  // Check if the selected item supports focus
+  const isFocusable = createMemo(() => {
+    const render = selectedRender();
+    if (!render) return false;
+    // Default to true if not specified, false if explicitly set to false
+    return render.tui?.focusable !== false;
+  });
+
   // Layout dimensions
   const sidebarWidth = () => Math.min(30, Math.floor(dimensions().width * 0.25));
-  const membersSidebarWidth = () => Math.min(24, Math.floor(dimensions().width * 0.18));
-  // Show members sidebar for channels and groups
-  const showMembersSidebar = () => {
-    const sel = currentSelection();
-    return sel && (sel.type === "channel" || sel.type === "group");
-  };
-  const contentWidth = () => {
-    const base = dimensions().width - sidebarWidth();
-    return showMembersSidebar() ? base - membersSidebarWidth() : base;
-  };
+  const contentWidth = () => dimensions().width - sidebarWidth();
 
   // Exit the app
   const handleExit = () => {
@@ -219,11 +278,11 @@ export function App() {
       return;
     }
 
-    // Enter to focus chat
+    // Enter to focus content (if focusable)
     if (evt.name === "return") {
       evt.preventDefault();
       evt.stopPropagation();
-      if (currentSelection()) {
+      if (currentSelection() && isFocusable()) {
         setViewMode("chat");
         setChatFocused(true);
       }
@@ -287,7 +346,7 @@ export function App() {
                   }
 
                   const isSelected = () => selectedItemId() === item.id;
-                  // Color based on item type: channels green, groups purple, agents blue
+                  // Color based on item type: channels green, groups purple, agents blue, github orange
                   const itemColor = () => {
                     if (isSelected()) return "#ffffff";
                     switch (item.type) {
@@ -295,6 +354,8 @@ export function App() {
                         return "#a3be8c"; // Green for channels
                       case "group":
                         return "#b48ead"; // Purple for groups
+                      case "github":
+                        return "#fab283"; // Orange for GitHub
                       default:
                         return "#88c0d0"; // Blue for DMs
                     }
@@ -348,20 +409,14 @@ export function App() {
                 when={viewMode() === "document"}
                 fallback={
                   <box flexDirection="row" width="100%" height="100%">
-                    <ChatView
-                      type={selection().type}
-                      id={selection().id}
-                      focused={chatFocused()}
-                      onBack={handleBack}
-                      onExit={handleExit}
-                    />
-                    <Show when={showMembersSidebar()}>
-                      <MembersSidebar
-                        type={selection().type}
-                        id={selection().id}
-                        width={membersSidebarWidth()}
-                        height={dimensions().height}
-                      />
+                    {/* Render fragment's content view */}
+                    <Show when={selectedFragment() && selectedRender()?.tui?.content}>
+                      {selectedRender()?.tui?.content?.({
+                        fragment: selectedFragment()!,
+                        focused: chatFocused(),
+                        onBack: handleBack,
+                        onExit: handleExit,
+                      })}
                     </Show>
                   </box>
                 }

@@ -1,4 +1,6 @@
 import { defineFragment, type Fragment } from "../fragment.ts";
+import { isAgent } from "../agent.ts";
+import { GroupChatContent } from "./tui/group-chat-content.tsx";
 
 /**
  * GroupChat type - a group chat with multiple participants defined via template.
@@ -48,7 +50,19 @@ export interface GroupChat<
  * ` {}
  * ```
  */
-export const GroupChat = defineFragment("group-chat")();
+export const GroupChat = defineFragment("group-chat")({
+  render: {
+    context: (groupChat: GroupChat) => {
+      // References are pre-resolved, so we can use isAgent directly
+      const members = groupChat.references.filter(isAgent).map((a) => a.id);
+      return members.length > 0 ? `@{${members.join(", ")}}` : `@{${groupChat.id}}`;
+    },
+    tui: {
+      content: GroupChatContent,
+      focusable: true,
+    },
+  },
+});
 
 /**
  * Type guard for GroupChat entities

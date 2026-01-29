@@ -1,19 +1,23 @@
 /**
  * GitHub integration for Fragment.
  *
- * Provides fragments for referencing GitHub repositories, issues,
- * pull requests, actions, and local clones.
+ * Provides a unified repository fragment for referencing GitHub repositories,
+ * with access to issues, pull requests, actions, and local clones.
  *
  * @example
  * ```typescript
- * import { GitHubRepository, GitHubIssue, GitHubPullRequest } from "fragment/github";
+ * import { GitHubRepository, fetchIssues, fetchPullRequests } from "fragment/github";
  *
- * class MyRepo extends GitHubRepository("my-repo", {
- *   owner: "my-org",
- *   repo: "my-project",
+ * class CloudflareSDK extends GitHubRepository("cloudflare-sdk", {
+ *   owner: "cloudflare",
+ *   repo: "cloudflare-typescript",
  * })`
- * # My Project Repository
+ * # Cloudflare TypeScript SDK
  * ` {}
+ *
+ * // Access repository data
+ * const issues = yield* fetchIssues(CloudflareSDK.props, { state: "open" });
+ * const prs = yield* fetchPullRequests(CloudflareSDK.props);
  * ```
  */
 
@@ -38,52 +42,39 @@ export {
   type Label,
 } from "./service.ts";
 
-// Repository fragment
+// Repository fragment (unified access to repo, issues, PRs, actions)
 export {
+  // Fragment
   GitHubRepository,
   isGitHubRepository,
+  type RepositoryProps,
+  // Repository
   fetchRepository,
   toRepository,
   type Repository,
-  type RepositoryProps,
-} from "./repository.ts";
-
-// Issue fragment
-export {
-  GitHubIssue,
-  isGitHubIssue,
+  // Issues
   fetchIssue,
   fetchIssues,
   watchIssues,
   toIssue,
   type Issue,
-  type IssueProps,
-} from "./issue.ts";
-
-// Pull Request fragment
-export {
-  GitHubPullRequest,
-  isGitHubPullRequest,
+  type ListIssuesOptions,
+  // Pull Requests
   fetchPullRequest,
   fetchPullRequests,
   toPullRequest,
   type PullRequest,
-  type PullRequestProps,
-} from "./pull-request.ts";
-
-// Actions fragment
-export {
-  GitHubActions,
-  isGitHubActions,
+  type ListPullRequestsOptions,
+  // Actions / Workflow Runs
   fetchWorkflowRuns,
   toWorkflowRun,
   type WorkflowRun,
   type WorkflowRunStatus,
   type WorkflowRunConclusion,
-  type ActionsProps,
-} from "./actions.ts";
+  type ListWorkflowRunsOptions,
+} from "./repository.ts";
 
-// Clone fragment
+// Clone fragment (local repository)
 export {
   GitHubClone,
   isGitHubClone,

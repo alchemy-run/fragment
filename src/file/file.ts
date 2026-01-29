@@ -1,4 +1,4 @@
-import type { Fragment } from "../fragment.ts";
+import { defineFragment, type Fragment } from "../fragment.ts";
 
 /**
  * File type - a file reference defined via template.
@@ -15,9 +15,24 @@ export interface File<
 }
 
 /**
+ * Internal builder using defineFragment with language and description as per-instance props.
+ */
+const FileBuilder = defineFragment("file")<{
+  language: string;
+  description: string;
+}>({
+  render: {
+    context: (file: File) => {
+      const filename = file.id.split("/").pop() || file.id;
+      return `[${filename}](${file.id})`;
+    },
+  },
+});
+
+/**
  * Type guard for File entities
  */
-export const isFile = (x: any): x is File => x?.type === "file";
+export const isFile = FileBuilder.is<File>;
 
 /**
  * Creates a File class from a name, language, path template, and description template.
@@ -35,15 +50,14 @@ export const File =
     descriptionTemplate: TemplateStringsArray,
     ..._descriptionRefs: any[]
   ): File<Name, Language, References> =>
-    class {
-      static readonly type = "file";
-      static readonly id = name;
-      static readonly references = references;
-      static readonly template = pathTemplate;
-      static readonly language = language;
-      static readonly description = descriptionTemplate.join("").trim();
-      constructor(_: never) {}
-    } as unknown as File<Name, Language, References>;
+    FileBuilder(name, {
+      language,
+      description: descriptionTemplate.join("").trim(),
+    })(pathTemplate, ...references) as unknown as File<
+      Name,
+      Language,
+      References
+    >;
 
 /**
  * Creates a language-specific file variant builder.
@@ -130,15 +144,10 @@ function createDescriptionBuilder<
       descriptionTemplate,
       descriptionRefs,
     );
-    return class {
-      static readonly type = "file";
-      static readonly id = id;
-      static readonly references = references;
-      static readonly template = pathTemplate;
-      static readonly language = language;
-      static readonly description = description;
-      constructor(_: never) {}
-    } as unknown as File<ID, Language, References>;
+    return FileBuilder(id, { language, description })(
+      pathTemplate,
+      ...references,
+    ) as unknown as File<ID, Language, References>;
   };
 }
 

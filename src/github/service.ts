@@ -346,10 +346,9 @@ const makeGitHubService = Effect.gen(function* () {
         );
       }
 
-      const json = yield* Effect.tryPromise({
-        try: () => response.json,
-        catch: (err) => new GitHubError({ message: `Failed to parse response: ${err}`, cause: err }),
-      });
+      const json = yield* response.json.pipe(
+        Effect.mapError((err) => new GitHubError({ message: `Failed to parse response: ${err}`, cause: err })),
+      );
 
       return json as T;
     });

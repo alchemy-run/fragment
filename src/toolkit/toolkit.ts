@@ -1,8 +1,6 @@
-import type { Fragment } from "../fragment.ts";
+import { defineFragment, type Fragment } from "../fragment.ts";
 import { isTool, type Tool } from "../tool/tool.ts";
 import { collectFlat } from "../util/collect-references.ts";
-
-export const isToolkit = (x: any): x is Toolkit => x?.type === "toolkit";
 
 export type IToolkit<
   ID extends string,
@@ -20,22 +18,43 @@ export type Toolkit<
   new (_: never): IToolkit<Name, Tools, References>;
 };
 
-export const Toolkit =
-  <ID extends string>(id: ID) =>
-  <const References extends any[]>(
+const ToolkitBuilder = defineFragment("toolkit")<{}>({
+  render: {
+    context: (toolkit: Toolkit) => `🧰${toolkit.id}`,
+  },
+  get tools(): Tool[] {
+    return collectFlat(
+      (this as unknown as Fragment<"toolkit", string, any[]>).references,
+      isTool,
+    );
+  },
+});
+
+/**
+ * Type guard for Toolkit fragments.
+ */
+export const isToolkit = ToolkitBuilder.is<Toolkit>;
+
+/**
+ * Creates a Toolkit fragment that groups tools together.
+ *
+ * @example
+ * ```typescript
+ * class CodingTools extends Toolkit("coding")`
+ *   ${ReadTool}
+ *   ${WriteTool}
+ *   ${GrepTool}
+ * ` {}
+ *
+ * // Access tools lazily
+ * CodingTools.tools // => [ReadTool, WriteTool, GrepTool]
+ * ```
+ */
+export const Toolkit = <ID extends string>(id: ID) =>
+  ToolkitBuilder(id) as unknown as <const References extends any[]>(
     template: TemplateStringsArray,
     ...references: References
-  ) => {
-    const tools = collectFlat(references, isTool);
-    return class {
-      static readonly type = "toolkit";
-      static readonly id = id;
-      static readonly tools = tools;
-      static readonly template = template;
-      static readonly references = references;
-      constructor(_: never) {}
-    } as any as Toolkit<ID, ExtractTools<References>, References>;
-  };
+  ) => Toolkit<ID, ExtractTools<References>, References>;
 
 type ExtractTools<
   References extends any[],

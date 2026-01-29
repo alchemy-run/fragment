@@ -11,9 +11,6 @@ import { isGroupChat, type GroupChat } from "../../chat/group-chat.ts";
 import { isFragment, type Fragment } from "../../fragment.ts";
 import {
   isGitHubRepository,
-  isGitHubIssue,
-  isGitHubPullRequest,
-  isGitHubActions,
   isGitHubClone,
 } from "../../github/index.ts";
 import { isGroup, type Group } from "../../org/group.ts";
@@ -27,9 +24,6 @@ export const isGitHubFragment = (
   x: unknown,
 ): x is Fragment<string, string, any[]> =>
   isGitHubRepository(x) ||
-  isGitHubIssue(x) ||
-  isGitHubPullRequest(x) ||
-  isGitHubActions(x) ||
   isGitHubClone(x);
 
 /**

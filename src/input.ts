@@ -59,6 +59,9 @@ export const input = <
     description: options?.description,
     template,
     references,
+    render: {
+      context: (input: Input<any, any, any[]>) => `\${${input.id}}`,
+    },
   });
   const input = (template: TemplateStringsArray, ...references: any[]) =>
     Object.assign(input, props(template, references));

@@ -30,6 +30,7 @@ import {
 } from "./util/json-schema.ts";
 import { log } from "./util/log.ts";
 import type { MessageEncoded } from "@effect/ai/Prompt";
+import { AgentContent } from "./tui/components/agent-content.tsx";
 
 /**
  * Extracts all tool_use IDs from a message's content.
@@ -152,7 +153,15 @@ export interface Agent<
 /**
  * Create an Agent - an AI agent that can be spawned and communicate with other agents.
  */
-export const Agent = defineFragment("agent")();
+export const Agent = defineFragment("agent")({
+  render: {
+    context: (agent: Agent) => `@${agent.id}`,
+    tui: {
+      content: AgentContent,
+      focusable: true,
+    },
+  },
+});
 
 /**
  * Type guard for Agent entities

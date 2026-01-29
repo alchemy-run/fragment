@@ -9,11 +9,11 @@ import {
 } from "../../src/org/index.ts";
 import { getAgentTools, getRoles } from "../../src/org/queries.ts";
 import { output } from "../../src/output.ts";
-import { tool } from "../../src/tool/tool.ts";
+import { Tool } from "../../src/tool/tool.ts";
 
 // Helper to create a minimal tool for testing
 const createTool = (id: string) =>
-  tool(id)`${id} tool ${input("x")} ${output("result")}`(function* ({ x }) {
+  Tool(id)`${id} tool ${input("x")} ${output("result")}`(function* ({ x }) {
     return { result: x };
   });
 

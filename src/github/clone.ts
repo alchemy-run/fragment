@@ -5,8 +5,11 @@
  * information about the local git state.
  */
 
+import { Command, CommandExecutor } from "@effect/platform";
 import * as Effect from "effect/Effect";
-import { defineFragment } from "../fragment.ts";
+import * as Path from "node:path";
+import { FragmentConfig } from "../config.ts";
+import { defineFragment, type Fragment } from "../fragment.ts";
 
 /**
  * GitHub clone properties for the fragment.
@@ -94,32 +97,42 @@ const parseRemoteUrl = (url: string): { owner: string; repo: string } => {
 };
 
 /**
+ * Resolve a path relative to the FragmentConfig cwd.
+ */
+const resolvePath = (
+  path: string,
+): Effect.Effect<string, never, FragmentConfig> =>
+  Effect.gen(function* () {
+    const config = yield* FragmentConfig;
+    return Path.isAbsolute(path) ? path : Path.resolve(config.cwd, path);
+  });
+
+/**
  * Execute a git command and return the output.
  */
 const git = (
   args: string[],
-  cwd: string,
-): Effect.Effect<string, Error> =>
-  Effect.tryPromise({
-    try: async () => {
-      const { exec } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execAsync = promisify(exec);
-      const result = await execAsync(`git ${args.join(" ")}`, { cwd });
-      return result.stdout.trim();
-    },
-    catch: (e) => new Error(`Git command failed: ${e}`),
-  });
+  path: string,
+): Effect.Effect<string, Error, CommandExecutor.CommandExecutor | FragmentConfig> =>
+  Effect.gen(function* () {
+    const cwd = yield* resolvePath(path);
+    const command = Command.make("git", ...args).pipe(Command.workingDirectory(cwd));
+    const output = yield* Command.string(command);
+    return output.trim();
+  }).pipe(Effect.mapError((e) => new Error(`Git command failed: ${e}`)));
 
 /**
  * Fetch local clone information.
  */
 export const fetchCloneInfo = (
   props: CloneProps,
-): Effect.Effect<CloneInfo, Error> =>
+): Effect.Effect<CloneInfo, Error, CommandExecutor.CommandExecutor | FragmentConfig> =>
   Effect.gen(function* () {
     const { path } = props;
     const remote = props.remote ?? "origin";
+
+    // Resolve the path relative to FragmentConfig cwd
+    const resolvedPath = yield* resolvePath(path);
 
     // Get remote URL
     const remoteUrl = yield* git(["remote", "get-url", remote], path);
@@ -148,7 +161,7 @@ export const fetchCloneInfo = (
     );
 
     return {
-      path,
+      path: resolvedPath,
       remoteUrl,
       branch,
       sha,
@@ -177,7 +190,30 @@ export const fetchCloneInfo = (
  * ` {}
  * ```
  */
-export const GitHubClone = defineFragment("github-clone")<CloneProps>();
+import { GitHubCloneSidebar } from "./tui/sidebar.tsx";
+
+/**
+ * GitHubClone type - a fragment representing a locally cloned GitHub repository.
+ * Extends Fragment for template support with path and remote properties.
+ */
+export interface GitHubClone<
+  ID extends string = string,
+  References extends any[] = any[],
+> extends Fragment<"github-clone", ID, References> {
+  readonly path: string;
+  readonly remote: string;
+}
+
+export const GitHubClone = defineFragment("github-clone")<CloneProps>({
+  render: {
+    context: (clone: GitHubClone) => `📂${clone.path}`,
+    tui: {
+      sidebar: GitHubCloneSidebar,
+      icon: "📂",
+      sectionTitle: "Local Clones",
+    },
+  },
+});
 
 /**
  * Type guard for GitHub Clone fragments.

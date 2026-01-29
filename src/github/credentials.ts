@@ -2,9 +2,11 @@
  * GitHub credentials service for Effect-based authentication.
  *
  * Provides a Context.Tag for GitHub API authentication that can be
- * configured from environment variables or provided explicitly.
+ * configured from environment variables, the `gh` CLI, or provided explicitly.
  */
 
+import { Command, CommandExecutor } from "@effect/platform";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -22,7 +24,7 @@ export interface GitHubCredentials {
    * Optional GitHub API base URL for GitHub Enterprise.
    * @default "https://api.github.com"
    */
-  readonly baseUrl?: string;
+  readonly baseUrl: string;
 }
 
 /**
@@ -42,10 +44,78 @@ export class GitHubCredentialsTag extends Context.Tag("GitHubCredentials")<
 >() {}
 
 /**
- * Layer that provides GitHub credentials from environment variables.
+ * Get the GitHub token from the `gh auth token` CLI command.
+ * This works if the user has already authenticated with `gh auth login`.
+ */
+const getTokenFromGhCli: Effect.Effect<
+  string,
+  Error,
+  CommandExecutor.CommandExecutor
+> = Effect.gen(function* () {
+  const command = Command.make("gh", "auth", "token");
+  const output = yield* Command.string(command).pipe(
+    Effect.mapError((e) => new Error(`Failed to run gh auth token: ${e}`)),
+  );
+  const token = output.trim();
+  if (!token) {
+    return yield* Effect.fail(
+      new Error("gh auth token returned empty output"),
+    );
+  }
+  return token;
+});
+
+/**
+ * Effect that resolves GitHub credentials from Config or `gh` CLI fallback.
  *
- * Reads from:
- * - `GITHUB_TOKEN` - Required personal access token
+ * Priority:
+ * 1. GITHUB_TOKEN from Config (environment variable or .env)
+ * 2. `gh auth token` CLI command (if user is logged in via `gh auth login`)
+ *
+ * Also reads GITHUB_API_URL for GitHub Enterprise support.
+ */
+export const resolveGitHubCredentials: Effect.Effect<
+  GitHubCredentials,
+  Error,
+  CommandExecutor.CommandExecutor
+> = Effect.gen(function* () {
+  const baseUrl = yield* Config.string("GITHUB_API_URL").pipe(
+    Config.withDefault("https://api.github.com"),
+    Effect.mapError(
+      (e) => new Error(`Failed to read GITHUB_API_URL config: ${e}`),
+    ),
+  );
+
+  // Try Config first (GITHUB_TOKEN from env or .env)
+  const tokenFromConfig = yield* Config.string("GITHUB_TOKEN").pipe(
+    Effect.option,
+  );
+
+  if (tokenFromConfig._tag === "Some") {
+    return { token: tokenFromConfig.value, baseUrl };
+  }
+
+  // Fall back to `gh auth token` CLI
+  const tokenFromCli = yield* getTokenFromGhCli.pipe(
+    Effect.mapError(
+      () =>
+        new Error(
+          "GitHub token not found. Set GITHUB_TOKEN environment variable or run `gh auth login`.",
+        ),
+    ),
+  );
+
+  return { token: tokenFromCli, baseUrl };
+});
+
+/**
+ * Layer that provides GitHub credentials from Config or `gh` CLI fallback.
+ *
+ * Priority:
+ * 1. `GITHUB_TOKEN` from Config (environment variable or .env)
+ * 2. `gh auth token` CLI command (if user is logged in via `gh auth login`)
+ *
+ * Also reads:
  * - `GITHUB_API_URL` - Optional base URL for GitHub Enterprise
  *
  * @example
@@ -55,22 +125,11 @@ export class GitHubCredentialsTag extends Context.Tag("GitHubCredentials")<
  * );
  * ```
  */
-export const GitHubCredentialsFromEnv: Layer.Layer<GitHubCredentialsTag> =
-  Layer.effect(
-    GitHubCredentialsTag,
-    Effect.sync(() => {
-      const token = process.env.GITHUB_TOKEN;
-      if (!token) {
-        throw new Error(
-          "GITHUB_TOKEN environment variable is required for GitHub API access",
-        );
-      }
-      return {
-        token,
-        baseUrl: process.env.GITHUB_API_URL ?? "https://api.github.com",
-      };
-    }),
-  );
+export const GitHubCredentialsFromEnv: Layer.Layer<
+  GitHubCredentialsTag,
+  Error,
+  CommandExecutor.CommandExecutor
+> = Layer.effect(GitHubCredentialsTag, resolveGitHubCredentials);
 
 /**
  * Creates a Layer that provides explicit GitHub credentials.
