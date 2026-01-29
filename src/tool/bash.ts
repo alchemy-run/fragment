@@ -7,7 +7,7 @@ import * as Stream from "effect/Stream";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import { CommandValidator } from "../util/command-validator.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const command = input("command")`The command to execute`;
 
@@ -39,7 +39,7 @@ Output: Creates directory 'foo'`;
 const exitCode = output("exitCode", S.Number);
 const out = output("output", S.String);
 
-export const bash = tool("bash", {
+export const bash = Tool("bash", {
   alias: (model) => (model?.includes("claude") ? "AnthropicBash" : undefined),
 })`Executes a given bash ${command} in a persistent shell session with optional ${timeout}, ensuring proper handling and security measures.
 Returns the ${exitCode} and ${out} containing both stdout and stderr.

@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const filePath = input(
   "filePath",
@@ -24,7 +24,7 @@ const content = output(
   "content",
 )`The file content, or an error message if the file cannot be read.`;
 
-export const read = tool("read")`Reads a file from the local filesystem.
+export const read = Tool("read")`Reads a file from the local filesystem.
 Returns the ${content} of the file.
 
 Given a ${filePath} and optional ${offset} and ${limit}:

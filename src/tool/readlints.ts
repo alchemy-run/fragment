@@ -5,7 +5,7 @@ import { input } from "../input.ts";
 import { formatDiagnostic } from "../lsp/diagnostics.ts";
 import { LSPManager } from "../lsp/index.ts";
 import { output } from "../output.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const paths = input(
   "paths",
@@ -16,7 +16,7 @@ const diagnostics = output(
   "diagnostics",
 )`The linter errors and diagnostics for the specified paths.`;
 
-export const readlints = tool(
+export const readlints = Tool(
   "readlints",
 )`Read and display linter errors from the workspace.
 Returns ${diagnostics} for the specified files.

@@ -22,7 +22,7 @@ import {
   type MessageWithSender,
 } from "./state/index.ts";
 import { toText } from "./stream.ts";
-import { tool } from "./tool/tool.ts";
+import { Tool } from "./tool/tool.ts";
 import { Toolkit } from "./toolkit/toolkit.ts";
 import {
   schemaFromJsonSchema,
@@ -317,7 +317,7 @@ export const spawn: <A extends Agent<string, any[]>>(
     // we shouldn't do this because more agents can be discovered later
     // S.Literal(...children.map((a) => a.agent.id)),
   )`The absolute path/ID of the recipient agent, e.g. a/b/c for agent @a/b/c`;
-  const send = tool(
+  const send = Tool(
     "send",
   )`Send a ${message} to ${recipient}, receive a response as a ${S.String}`(
     function* ({ message, recipient }) {
@@ -332,7 +332,7 @@ export const spawn: <A extends Agent<string, any[]>>(
 
   const schema = input("schema")`The expected schema of the query response`;
   const object = output("object", S.Any);
-  const query = tool(
+  const query = Tool(
     "query",
   )`Send a query ${message} to the ${recipient} agent and receive back a structured ${object} with the expected schema ${schema}`(
     function* ({ recipient, message, schema: jsonSchema }) {

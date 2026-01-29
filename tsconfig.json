@@ -12,6 +12,7 @@
       "ESNext",
       "DOM"
     ],
+    "types": ["bun-types"],
     "target": "ESNext",
     "moduleDetection": "force",
     "allowJs": true,

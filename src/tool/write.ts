@@ -7,7 +7,7 @@ import {
   getDiagnosticsIfAvailable,
 } from "../lsp/diagnostics.ts";
 import { output } from "../output.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const filePath = input(
   "filePath",
@@ -19,7 +19,7 @@ const result = output(
   "result",
 )`The result of the write operation, including any diagnostics from LSP.`;
 
-export const write = tool("write")`Writes a file to the local filesystem.
+export const write = Tool("write")`Writes a file to the local filesystem.
 Returns the ${result} of the operation.
 
 Given a ${filePath} and ${content}:

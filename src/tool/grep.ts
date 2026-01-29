@@ -6,7 +6,7 @@ import * as S from "effect/Schema";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import { exec } from "../util/exec.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const MAX_LINE_LENGTH = 2000;
 
@@ -29,7 +29,7 @@ const matches = output(
   "matches",
 )`The search results showing file paths and matching lines, sorted by modification time.`;
 
-export const grep = tool(
+export const grep = Tool(
   "grep",
 )`Fast content search tool that works with any codebase size.
 Returns ${matches} with file paths and line numbers.

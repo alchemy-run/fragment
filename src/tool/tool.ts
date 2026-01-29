@@ -54,7 +54,7 @@ export declare namespace Tools {
     : [];
 }
 
-export const tool =
+export const Tool =
   <ID extends string>(
     id: ID,
     options?: {

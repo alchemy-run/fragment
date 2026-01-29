@@ -9,7 +9,7 @@ import {
 } from "../lsp/diagnostics.ts";
 import { output } from "../output.ts";
 import { replace } from "../util/replace.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const filePath = input("filePath")`The absolute path to the file to modify`;
 
@@ -30,33 +30,20 @@ const result = output(
   "result",
 )`The result of the edit operation, including any diagnostics from LSP.`;
 
-export const edit = tool("edit")`Performs exact string replacements in files.
+export const edit = Tool("edit")`Performs exact string replacements in files.
 Returns the ${result} of the operation.
 
 Given a ${filePath}, ${oldString}, and ${newString}:
-- Replaces the first occurrence of oldString with newString
+- Replaces the first occurrence of ${oldString} with ${newString}
 - Use ${replaceAll} to replace all occurrences (defaults to false)
-- Use empty oldString ("") to create a new file with newString as content
-
-Usage:
-- You must use your \`Read\` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
-- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the oldString or newString.
-- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
-- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
-- The edit will FAIL if \`oldString\` is not found in the file with an error "oldString not found in content".
-- The edit will FAIL if \`oldString\` is found multiple times in the file with an error "oldString found multiple times and requires more code context to uniquely identify the intended match". Either provide a larger string with more surrounding context to make it unique or use \`replaceAll\` to change every instance of \`oldString\`.
-- Use \`replaceAll\` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.
+- Use empty ${oldString} ("") to create a new file with ${newString} as content
 `(function* ({
   filePath: _filePath,
   oldString,
   newString,
   replaceAll: doReplaceAll,
 }) {
-  yield* Effect.logDebug(
-    `[edit] filePath=${_filePath} oldString.length=${oldString.length} newString.length=${newString.length} replaceAll=${doReplaceAll}`,
-  );
-
-  const pathService = yield* Path.Path;
+    const pathService = yield* Path.Path;
   const fs = yield* FileSystem.FileSystem;
 
   const filePath = pathService.isAbsolute(_filePath)

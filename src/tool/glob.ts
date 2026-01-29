@@ -6,7 +6,7 @@ import * as S from "effect/Schema";
 import { input } from "../input.ts";
 import { output } from "../output.ts";
 import * as Ripgrep from "../util/ripgrep.ts";
-import { tool } from "./tool.ts";
+import { Tool } from "./tool.ts";
 
 const pattern = input("pattern")`The glob pattern to match files against.
 Patterns not starting with "**/" are automatically prepended with "**/" to enable recursive searching.
@@ -25,7 +25,7 @@ const files = output(
   "files",
 )`The list of matching file paths, sorted by modification time (most recent first). Returns a message if no files are found.`;
 
-export const glob = tool(
+export const glob = Tool(
   "glob",
 )`Fast file pattern matching tool that works with any codebase size.
 Returns matching ${files} sorted by modification time.

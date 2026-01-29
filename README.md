@@ -1,19 +1,64 @@
 # fragment
 
-Model AI agents and organizations as code using string templates.
+Build AI agent organizations by composing fragments.
+
+## CLI
+
+```bash
+# Launch TUI with default config (./fragment.config.ts)
+fragment
+
+# Use a custom config file
+fragment ./path/to/config.ts
+
+# Run from another directory
+fragment --cwd ../my-project
+```
+
+## What is a Fragment?
+
+A **fragment** is the core building block — a typed, composable unit defined using template literals. Agents, groups, roles, channels, files, and tools are all fragments. By embedding fragments within each other using `${Reference}`, you compose them into a complete organization:
+
+```typescript
+import { Agent, Org, Chat } from "fragment";
+
+// Each of these is a fragment
+class Alice extends Agent("alice")`Senior engineer` {}
+class Bob extends Agent("bob")`Junior engineer` {}
+
+// Fragments compose into larger structures
+class Engineering extends Org.Group("engineering")`
+Team members: ${Alice}, ${Bob}
+` {}
+
+class EngineeringChannel extends Chat.Channel("engineering")`
+Discussions for ${Engineering}
+` {}
+
+// The root fragment ties everything together
+export default class TechLead extends Agent("tech-lead")`
+Manages ${Engineering} via ${EngineeringChannel}
+` {}
+```
+
+Every fragment has:
+- **type** — What kind of fragment (`agent`, `group`, `role`, `channel`, `file`, etc.)
+- **id** — A unique identifier
+- **template** — The template literal content (becomes context/prompts)
+- **references** — Other fragments embedded via `${...}`
 
 ## Features
 
-- **Declarative agents** — Define AI agents with organizational context using template literals
-- **Organizational structure** — Groups, Roles, Channels, and GroupChats model real team dynamics
-- **Typed tools** — Tools with Effect-based handlers and schema-validated inputs/outputs
-- **File references** — Agents can reference folders, markdown, TypeScript, and other files
+- **Composable fragments** — Everything is a fragment; compose them into organizations
+- **Organizational modeling** — Groups, Roles, Channels, and GroupChats model real team dynamics
+- **Typed tools** — Effect-based handlers with schema-validated inputs/outputs
+- **File references** — Reference folders, markdown, TypeScript, and other files as fragments
 - **TUI interface** — Interactive terminal UI for chatting with agents
 
 ## Installation
 
 ```bash
-npm install fragment effect @effect/ai @effect/platform
+bun add fragment effect @effect/ai @effect/platform
 ```
 
 ## Quick Start
@@ -37,12 +82,12 @@ A helpful AI assistant.
 Launch the TUI:
 
 ```bash
-npx fragment
+bunx fragment
 ```
 
 ## Agents
 
-Agents are AI entities defined via template literals. The template becomes the agent's system prompt:
+Agents are fragments that represent AI entities. The template becomes the agent's system prompt:
 
 ```typescript
 import { Agent } from "fragment";
@@ -64,7 +109,10 @@ class CodeReviewer extends Agent("code-reviewer")`
 
 ### Agent References
 
-Agents can reference other agents, creating an organizational hierarchy:
+Agents can reference other agents. When you splice `${Agent}` into another agent:
+- The referenced agent becomes **discoverable** — the parent can send messages to it
+- The reference appears in the parent's **system prompt** with the agent's ID
+- This creates an organizational hierarchy for coordination
 
 ```typescript
 class TechLead extends Agent("tech-lead")`
@@ -81,142 +129,14 @@ class TechLead extends Agent("tech-lead")`
 ` {}
 ```
 
-## Groups
-
-Groups are organizational units containing agents:
-
-```typescript
-import { Agent, Org } from "fragment";
-
-class Alice extends Agent("alice")`Senior engineer` {}
-class Bob extends Agent("bob")`Junior engineer` {}
-
-class Engineering extends Org.Group("engineering")`
-## Engineering Team
-
-Technical implementation and testing.
-
-### Members
-- ${Alice}
-- ${Bob}
-
-### Responsibilities
-- Write code
-- Review PRs
-- Fix bugs
-` {}
-```
-
-### Nested Groups
-
-Groups can contain other groups for hierarchical organization:
-
-```typescript
-class Platform extends Org.Group("platform")`
-## Platform Team
-
-Infrastructure and tooling.
-
-### Members
-- ${Engineering}
-- ${DevOps}
-` {}
-```
-
-## Roles
-
-Roles define capabilities and permissions that agents can inherit:
-
-```typescript
-import { Org, Toolkit } from "fragment";
-import { bash, read, write } from "fragment/tool";
-
-class Coding extends Toolkit.Toolkit("Coding")`
-Tools for development:
-- ${bash}
-- ${read}
-- ${write}
-` {}
-
-class Developer extends Org.Role("developer")`
-## Developer Role
-
-Can write and execute code.
-
-### Tools
-${Coding}
-
-### Standards
-- Follow coding conventions
-- Write tests for new code
-- Document public APIs
-` {}
-```
-
-Agents inherit tools from their roles:
-
-```typescript
-class Engineer extends Agent("engineer")`
-# Engineer
-
-## Roles
-${Developer}
-
-## Responsibilities
-- Implement features
-- Fix bugs
-` {}
-```
-
-## Channels
-
-Channels are communication spaces where agents collaborate:
-
-```typescript
-import { Agent, Chat } from "fragment";
-
-class EngineeringChannel extends Chat.Channel("engineering")`
-## #engineering
-
-Technical discussions and decisions.
-
-### Members
-- ${Engineering}
-
-### Topics
-- Architecture decisions
-- Code reviews
-- Technical debt
-` {}
-```
-
-## Group Chats
-
-GroupChats are ad-hoc discussions for specific topics:
-
-```typescript
-import { Chat } from "fragment";
-
-class FeatureDiscussion extends Chat.GroupChat("feature-team")`
-## Feature Development
-
-Coordination for the new feature.
-
-### Participants
-- ${Frontend}
-- ${Backend}
-- ${Designer}
-
-### Purpose
-- Design collaboration
-- Implementation planning
-- Testing coordination
-` {}
-```
+The TechLead can now send messages to CodeReviewer and Architect using their IDs.
 
 ## Tools
 
-Tools are Effect-based functions with typed inputs and outputs:
+Tools are fragments that represent callable functions. When you splice `${input}` and `${output}` into a tool:
+- Inputs become **typed parameters** the tool accepts
+- Outputs define the **return type** with schema validation
+- The template becomes the tool's **description** for the AI
 
 ```typescript
 import { Tool, input, output } from "fragment";
@@ -226,7 +146,7 @@ import * as Effect from "effect/Effect";
 const filePath = input("path")`The file path to read`;
 const content = output("content", S.String);
 
-const readFile = Tool.tool("read-file")`
+const readFile = Tool("read-file")`
 Read a file at ${filePath} and return its ${content}
 `(function* ({ path }) {
   const fs = yield* FileSystem;
@@ -234,6 +154,8 @@ Read a file at ${filePath} and return its ${content}
   return { content: data };
 });
 ```
+
+The tool now accepts `{ path: string }` and returns `{ content: string }`.
 
 ### Tool Inputs
 
@@ -274,7 +196,9 @@ const user = output("user", S.Struct({
 
 ## Toolkits
 
-Toolkits bundle related tools together:
+Toolkits are fragments that bundle tools. When you splice `${tool}` into a toolkit:
+- The tool becomes **part of the bundle**
+- Agents or roles that reference the toolkit gain access to all bundled tools
 
 ```typescript
 import { Toolkit } from "fragment";
@@ -290,9 +214,13 @@ Tools for reading, writing, and editing code:
 ` {}
 ```
 
+Any agent with `${Coding}` in their template gains bash, read, write, and edit tools.
+
 ## Files
 
-File references let agents understand project structure:
+Files are fragments that reference project files and folders. When you splice `${File}` into an agent:
+- The file's **path and description** become part of the agent's context
+- Agents understand the project structure and can reference these files
 
 ```typescript
 import { File } from "fragment";
@@ -315,7 +243,9 @@ Application configuration.
 
 ### Nested File References
 
-Files can reference other files to build a hierarchy:
+When you splice `${File}` into another file's path:
+- The parent file's path is **interpolated** into the child's path
+- This creates a hierarchy of file references
 
 ```typescript
 class Src extends File.Folder`src/``
@@ -331,194 +261,161 @@ Reusable button component.
 ` {}
 ```
 
-## Complete Example
+Button's path resolves to `src/components/Button.tsx`.
 
-Here's a complete organizational structure:
+## Groups
+
+Groups are fragments that represent organizational units. When you splice `${Agent}` into a group:
+- The agent becomes a **member** of that group
+- When the group is referenced elsewhere, all members are included
 
 ```typescript
-import { Agent, Chat, Org, Toolkit, File } from "fragment";
-import { bash, read, write, edit, grep, glob } from "fragment/tool";
+import { Agent, Org } from "fragment";
 
-// Files
-class Docs extends File.Folder`docs/``Documentation` {}
-class Src extends File.Folder`src/``Source code` {}
-class Tests extends File.Folder`test/``Test files` {}
+class Alice extends Agent("alice")`Senior engineer` {}
+class Bob extends Agent("bob")`Junior engineer` {}
 
-// Toolkits
+class Engineering extends Org.Group("engineering")`
+## Engineering Team
+
+Technical implementation and testing.
+
+### Members
+- ${Alice}
+- ${Bob}
+
+### Responsibilities
+- Write code
+- Review PRs
+- Fix bugs
+` {}
+```
+
+Now `Engineering` represents both Alice and Bob. Referencing `${Engineering}` anywhere includes both agents.
+
+### Nested Groups
+
+When you splice `${Group}` into another group:
+- All members of the nested group become **transitive members** of the parent
+- This enables hierarchical team structures
+
+```typescript
+class Platform extends Org.Group("platform")`
+## Platform Team
+
+Infrastructure and tooling.
+
+### Members
+- ${Engineering}
+- ${DevOps}
+` {}
+```
+
+Platform now includes all members of Engineering and DevOps.
+
+## Roles
+
+Roles are fragments that define capabilities. When you splice `${Toolkit}` into a role:
+- The role **gains access** to all tools in that toolkit
+
+```typescript
+import { Org, Toolkit } from "fragment";
+import { bash, read, write } from "fragment/tool";
+
 class Coding extends Toolkit.Toolkit("Coding")`
-Development tools:
-- ${bash} - ${read} - ${write} - ${edit} - ${grep} - ${glob}
+Tools for development:
+- ${bash}
+- ${read}
+- ${write}
 ` {}
 
-class Reviewing extends Toolkit.Toolkit("Reviewing")`
-Review tools (read-only):
-- ${read} - ${grep} - ${glob}
-` {}
+class Developer extends Org.Role("developer")`
+## Developer Role
 
-// Roles
-class DeveloperRole extends Org.Role("developer")`
-## Developer
-Can write code. Uses ${Coding}.
-` {}
+Can write and execute code.
 
-class ReviewerRole extends Org.Role("reviewer")`
-## Reviewer
-Can review code. Uses ${Reviewing}.
-` {}
+### Tools
+${Coding}
 
-// Agents
-class SeniorEngineer extends Agent("senior-engineer")`
-# Senior Engineer
+### Standards
+- Follow coding conventions
+- Write tests for new code
+- Document public APIs
+` {}
+```
+
+When you splice `${Role}` into an agent:
+- The agent **inherits all tools** from that role
+- The role's description becomes part of the agent's context
+
+```typescript
+class Engineer extends Agent("engineer")`
+# Engineer
 
 ## Roles
-${DeveloperRole}
-${ReviewerRole}
-
-## Responsibilities
-- Architect solutions
-- Review junior work
-- Mentor team
-` {}
-
-class JuniorEngineer extends Agent("junior-engineer")`
-# Junior Engineer
-
-## Roles
-${DeveloperRole}
+${Developer}
 
 ## Responsibilities
 - Implement features
-- Write tests
-- Learn from reviews
+- Fix bugs
 ` {}
+```
 
-// Groups
-class Engineering extends Org.Group("engineering")`
-## Engineering Team
-- ${SeniorEngineer}
-- ${JuniorEngineer}
-` {}
-
-// Channels
-class EngineeringChannel extends Chat.Channel("engineering")`
-## #engineering
-Technical discussions.
-Members: ${Engineering}
-` {}
-
-// Root Agent (default export)
-export default class TechLead extends Agent("tech-lead")`
-# Tech Lead
-
-## Organization
-- ${Engineering}
+Engineer now has access to bash, read, and write tools from the Developer role.
 
 ## Channels
-- ${EngineeringChannel}
 
-## Artifacts
-- ${Docs} - ${Src} - ${Tests}
+Channels are fragments that represent persistent communication spaces. When you splice `${Agent}` or `${Group}` into a channel:
+- Agents become **participants** who can send and receive messages
+- Groups are **expanded** — all members become participants
 
-## Responsibilities
-- Set technical direction
-- Remove blockers
-- Coordinate delivery
+```typescript
+import { Agent, Chat } from "fragment";
+
+class EngineeringChannel extends Chat.Channel("engineering")`
+## #engineering
+
+Technical discussions and decisions.
+
+### Members
+- ${Engineering}
+
+### Topics
+- Architecture decisions
+- Code reviews
+- Technical debt
 ` {}
 ```
 
-## CLI
+Since `${Engineering}` is a group containing Alice and Bob, both become channel participants.
 
-```bash
-# Launch TUI with default config (./fragment.config.ts)
-fragment
+## Group Chats
 
-# Use a custom config file
-fragment ./path/to/config.ts
-
-# Use a specific model
-fragment --model claude-opus
-
-# Run from another directory
-fragment --cwd ../my-project
-```
-
-### Available Models
-
-- `claude-sonnet` (default) — Claude Sonnet 4
-- `claude-haiku` — Claude Haiku 4.5
-- `claude-opus` — Claude Opus 4
-
-Or specify a full model ID:
-
-```bash
-fragment --model claude-sonnet-4-20250514
-```
-
-## Environment Variables
-
-Create a `.env` file:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-## API
-
-### Spawning Agents Programmatically
+GroupChats are fragments for ad-hoc discussions. Like channels, splicing `${Agent}` or `${Group}`:
+- Makes agents **participants** in the discussion
+- Groups are expanded to include all members
 
 ```typescript
-import { spawn, Agent } from "fragment";
-import { StateStore } from "fragment";
-import * as Effect from "effect/Effect";
-import * as Stream from "effect/Stream";
+import { Chat } from "fragment";
 
-class MyAgent extends Agent("my-agent")`A helpful assistant` {}
+class FeatureDiscussion extends Chat.GroupChat("feature-team")`
+## Feature Development
 
-const program = Effect.gen(function* () {
-  const instance = yield* spawn(MyAgent);
-  
-  // Stream responses
-  const response = yield* instance.send("Hello!").pipe(
-    Stream.runCollect,
-  );
-  
-  // Or query for structured data
-  const result = yield* instance.query(
-    "List the top 3 priorities",
-    S.Array(S.String),
-  );
-});
+Coordination for the new feature.
+
+### Participants
+- ${Frontend}
+- ${Backend}
+- ${Designer}
+
+### Purpose
+- Design collaboration
+- Implementation planning
+- Testing coordination
+` {}
 ```
 
-### Creating Custom Tools
-
-```typescript
-import { Tool, input, output } from "fragment";
-import * as S from "effect/Schema";
-import * as Effect from "effect/Effect";
-
-const query = input("query")`SQL query to execute`;
-const rows = output("rows", S.Array(S.Record(S.String, S.Unknown)));
-
-const sqlQuery = Tool.tool("sql-query")`
-Execute a SQL ${query} and return ${rows}
-`(function* ({ query }) {
-  const db = yield* Database;
-  const result = yield* db.execute(query);
-  return { rows: result };
-});
-```
-
-## Architecture
-
-Fragment uses a declarative template-based approach where:
-
-1. **Templates become prompts** — Agent templates are rendered into system prompts
-2. **References create relationships** — `${OtherAgent}` creates a reference that's resolved at runtime
-3. **Tools are typed** — Input/output schemas provide type safety and validation
-4. **State is persistent** — Conversations are stored in SQLite for continuity
-
-The TUI provides a Slack-like interface for navigating the organization and chatting with agents.
+Frontend, Backend, and Designer can all participate in this group chat.
 
 ## License
 

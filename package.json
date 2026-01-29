@@ -5,6 +5,14 @@
     "fragment": "./bin/fragment.ts"
   },
   "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "test:tui": "bun test --preload @opentui/solid/preload ./test/tui/ --",
+    "test:tui:update": "bun test --preload @opentui/solid/preload ./test/tui/ --update-snapshots",
+    "test:watch": "vitest",
+    "download:env": "doppler secrets download --no-file --format env > .env"
+  },
   "exports": {
     ".": {
       "bun": "./src/index.ts",
@@ -35,13 +43,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "test": "vitest run",
-    "test:tui": "bun test --preload @opentui/solid/preload ./test/tui/ --",
-    "test:tui:update": "bun test --preload @opentui/solid/preload ./test/tui/ --update-snapshots",
-    "test:watch": "vitest",
-    "download:env": "doppler secrets download --no-file --format env > .env"
-  },
   "dependencies": {
     "@effect/ai": "latest",
     "@effect/ai-anthropic": "latest",
@@ -63,6 +64,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "latest",
+    "bun-types": "latest",
     "typescript": "^5",
     "vite-plugin-solid": "^2.11.10",
     "vitest": "latest"

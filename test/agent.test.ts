@@ -259,8 +259,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       const uniqueThreadId = `duplicate-parts-test-${Date.now()}`;
 
       // Clean up any existing thread data
-      yield* store.deleteThread("orchestrator-agent", uniqueThreadId);
-      yield* store.deleteThread("helper-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
 
       // Spawn orchestrator which will delegate to helper
       const orchestrator = yield* spawn(OrchestratorAgent, uniqueThreadId);
@@ -275,15 +274,15 @@ Implement tests per ${TestPlan} using ${Coding}.
       );
 
       // Read persisted parts for the orchestrator
-      const orchestratorParts = yield* store.readThreadParts(
-        "orchestrator-agent",
+      const orchestratorParts = yield* store.readAgentParts(
         uniqueThreadId,
+        "orchestrator-agent",
       );
 
       // Read persisted parts for the helper
-      const helperParts = yield* store.readThreadParts(
-        "helper-agent",
+      const helperParts = yield* store.readAgentParts(
         uniqueThreadId,
+        "helper-agent",
       );
 
       // Check for duplicate part IDs in orchestrator parts
@@ -370,8 +369,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       );
 
       // Clean up
-      yield* store.deleteThread("orchestrator-agent", uniqueThreadId);
-      yield* store.deleteThread("helper-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
     }),
   );
 
@@ -383,8 +381,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       const uniqueThreadId = `tui-pattern-test-${Date.now()}`;
 
       // Clean up any existing state
-      yield* store.deleteThread("orchestrator-agent", uniqueThreadId);
-      yield* store.deleteThread("helper-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
 
       // Step 1: Create agent and send a message that triggers a tool call
       const orchestrator1 = yield* spawn(OrchestratorAgent, uniqueThreadId);
@@ -402,10 +399,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       expect(toolCalls1.length).toBeGreaterThan(0);
 
       // Step 2: Read persisted messages (simulating TUI opening later)
-      const messages1 = yield* store.readThreadMessages(
-        "orchestrator-agent",
-        uniqueThreadId,
-      );
+      const messages1 = yield* store.readThreadMessages(uniqueThreadId);
 
       // Extract all tool_use IDs from messages
       const extractToolIds = (messages: readonly any[]): string[] => {
@@ -431,9 +425,9 @@ Implement tests per ${TestPlan} using ${Coding}.
 
       // Step 3: Simulate TUI - load existing parts
       // Note: Parts may or may not be empty depending on timing of flush/truncate
-      const existingParts = yield* store.readThreadParts(
-        "orchestrator-agent",
+      const existingParts = yield* store.readAgentParts(
         uniqueThreadId,
+        "orchestrator-agent",
       );
       console.log(`Existing parts after session 1: ${existingParts.length}`);
 
@@ -449,10 +443,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       );
 
       // Step 5: Verify all tool_use IDs are unique across all messages
-      const messages2 = yield* store.readThreadMessages(
-        "orchestrator-agent",
-        uniqueThreadId,
-      );
+      const messages2 = yield* store.readThreadMessages(uniqueThreadId);
 
       const toolIds2 = extractToolIds(messages2);
       const uniqueToolIds2 = [...new Set(toolIds2)];
@@ -479,8 +470,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       ).toBe(uniqueToolIds2.length);
 
       // Clean up
-      yield* store.deleteThread("orchestrator-agent", uniqueThreadId);
-      yield* store.deleteThread("helper-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
     }),
   );
 
@@ -492,7 +482,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       const uniqueThreadId = `concurrent-flush-test-${Date.now()}`;
 
       // Clean up any existing state
-      yield* store.deleteThread("test-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
 
       // Create agent
       const agent = yield* spawn(TestAgent, uniqueThreadId);
@@ -511,10 +501,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       expect(results.length).toBe(3);
 
       // Read persisted messages
-      const messages = yield* store.readThreadMessages(
-        "test-agent",
-        uniqueThreadId,
-      );
+      const messages = yield* store.readThreadMessages(uniqueThreadId);
 
       // Collect all content block IDs (text blocks don't have IDs, but tool-calls do)
       // For this test, we verify no duplicate user messages
@@ -527,7 +514,7 @@ Implement tests per ${TestPlan} using ${Coding}.
       expect(assistantMessages.length).toBeGreaterThanOrEqual(3);
 
       // Clean up
-      yield* store.deleteThread("test-agent", uniqueThreadId);
+      yield* store.deleteThread(uniqueThreadId);
     }),
   );
 });
